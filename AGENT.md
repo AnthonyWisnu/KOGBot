@@ -21,6 +21,10 @@ Bangun WhatsApp bot yang stabil, modular, dan mudah dikembangkan dengan fitur ut
 - Tic Tac Toe
 - Sistem poin per grup
 - Sistem limit downloader
+- Owner unlimited poin dan limit
+- Profile user
+- Daily reward
+- Transfer limit antar user
 - Download TikTok publik tanpa watermark
 - Download Instagram Reels publik
 - Welcome member baru
@@ -29,6 +33,7 @@ Bangun WhatsApp bot yang stabil, modular, dan mudah dikembangkan dengan fitur ut
 - Role owner dan admin grup
 - Reply-based surrender untuk game aktif
 - Reset poin manual owner dengan konfirmasi
+- Owner tools untuk memberi poin, memberi limit, dan reset limit user
 
 Fitur yang tidak dibuat di versi awal:
 
@@ -134,7 +139,9 @@ File berikut dikecualikan dari batas baris:
 15. Reset poin hanya boleh manual oleh owner dengan konfirmasi.
 16. Downloader harus memakai limit per user per grup.
 17. Limit berkurang hanya jika download berhasil dikirim.
-18. Bot harus bisa dijalankan di VPS Ubuntu menggunakan PM2.
+18. Owner selalu tampil 999 poin dan 999 limit tanpa menyimpan angka 999 permanen di database.
+19. Bot harus punya profile user, daily reward, dan transfer limit.
+20. Bot harus bisa dijalankan di VPS Ubuntu menggunakan PM2.
 
 ---
 
@@ -168,8 +175,12 @@ Daftar command:
 .nyerah tictactoe
 .rank
 .poin
+.profile
+.profile @user
 .limit
 .belilimit <jumlah>
+.transferlimit @user <jumlah>
+.daily
 .tt <link>
 .ig <link>
 .s
@@ -182,6 +193,9 @@ Daftar command:
 .listgroup
 .resetpoin
 .confirmresetpoin
+.givepoin @user <jumlah>
+.givelimit @user <jumlah>
+.resetlimit @user
 .ownermenu
 ```
 
@@ -199,6 +213,11 @@ Owner dapat:
 - Remove group dari whitelist
 - Melihat daftar group approved
 - Reset poin grup secara manual dengan konfirmasi
+- Melihat profile user
+- Transfer limit tanpa mengurangi limit owner
+- Memberi poin ke user dengan `.givepoin`
+- Memberi limit ke user dengan `.givelimit`
+- Reset limit user ke 3 dengan `.resetlimit`
 - Reset semua data jika diperlukan
 - Mengatur konfigurasi utama bot
 - Menggunakan semua command admin
@@ -227,8 +246,11 @@ Member grup dapat:
 - Menjawab game
 - Menyerah dari game
 - Melihat poin dan ranking
+- Melihat profile sendiri atau member lain
 - Melihat limit download
 - Membeli limit download dengan poin
+- Transfer limit ke member lain
+- Claim daily reward 1 kali per 24 jam
 - Menggunakan downloader TikTok dan Instagram Reels publik
 
 ---
@@ -526,6 +548,9 @@ Tic Tac Toe seri     : +5 poin untuk masing-masing pemain
 Salah jawab          : tidak dikurangi
 Leaderboard          : .rank (top 10 per grup)
 Cek poin pribadi     : .poin
+Profile user         : .profile / .profile @user
+Daily reward         : .daily
+Transfer limit       : .transferlimit @user <jumlah>
 Reset poin           : manual owner dengan konfirmasi
 ```
 
@@ -534,6 +559,9 @@ Command:
 ```
 .poin
 .rank
+.profile
+.daily
+.transferlimit @user <jumlah>
 .resetpoin
 .confirmresetpoin
 ```
@@ -561,7 +589,26 @@ Download gagal         : limit tidak berkurang
 Beli limit             : 10 poin = 1 limit
 Cek limit              : .limit
 Beli limit             : .belilimit <jumlah>
+Transfer limit         : .transferlimit @user <jumlah>
+Daily reward           : .daily, 1 kali per 24 jam
+Owner                  : tampil 999 poin dan 999 limit
 ```
+
+Command owner:
+
+```
+.givepoin @user <jumlah>
+.givelimit @user <jumlah>
+.resetlimit @user
+```
+
+Aturan owner tools:
+
+- `.givepoin` menambah poin target pada grup tempat command dijalankan.
+- `.givelimit` menambah limit download target pada grup tempat command dijalankan.
+- `.resetlimit` mengembalikan limit target ke default 3.
+- Ketiganya hanya boleh dijalankan owner.
+- Jika target adalah owner, poin dan limit tetap tampil 999 tanpa menyimpan angka 999 permanen.
 
 ---
 
@@ -704,9 +751,14 @@ _Contoh: *.nyerah kuis*_
 
 🏆 *POIN & LIMIT*
 *.poin* - Cek poin kamu
+*.profile* / *@user* - Profil
 *.rank* - Ranking grup
 *.limit* - Cek limit download
 *.belilimit <jumlah>* - Beli limit
+*.transferlimit @user <jumlah>* - Kirim limit
+
+*REWARD*
+*.daily* - Klaim hadiah harian
 
 📥 *DOWNLOADER*
 *.tt <link>* - Download TikTok
@@ -739,6 +791,9 @@ Owner Menu
 .removegroup    - Nonaktifkan bot dari grup ini
 .listgroup      - Lihat daftar grup approved
 .resetpoin      - Reset poin grup dengan konfirmasi
+.givepoin @user jumlah  - Tambah poin user
+.givelimit @user jumlah - Tambah limit user
+.resetlimit @user       - Reset limit user ke 3
 ```
 
 ---
@@ -900,6 +955,22 @@ model UserDownloadLimit {
   limit     Int      @default(3)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([userJid, groupJid])
+}
+```
+
+### UserStats
+
+```prisma
+model UserStats {
+  id             String    @id @default(cuid())
+  userJid        String
+  groupJid       String
+  gamesWon       Int       @default(0)
+  lastDailyClaim DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@unique([userJid, groupJid])
 }
@@ -1193,16 +1264,21 @@ Project dianggap selesai jika:
 29. `.limit` menampilkan limit download user.
 30. `.belilimit <jumlah>` membeli limit dengan konversi 10 poin = 1 limit.
 31. User baru mendapat 3 limit gratis per grup.
-32. `.tt <link>` memproses link TikTok publik via `yt-dlp`.
-33. `.ig <link>` memproses link Instagram Reels publik via `yt-dlp`.
-34. Downloader mengurangi 1 limit hanya setelah video berhasil dikirim.
-35. Download gagal tidak mengurangi limit.
-36. File downloader dibatasi maksimal 50 MB.
-37. Welcome message berjalan saat member baru masuk.
-38. Admin grup bisa mengubah welcome message.
-39. Bot bisa dijalankan dengan PM2 di VPS Ubuntu.
-40. Error tidak membuat bot crash.
-41. Session WhatsApp tersimpan di folder `sessions/`.
+32. Owner selalu tampil 999 poin dan 999 limit.
+33. `.profile` dan `.profile @user` menampilkan profil user.
+34. `.transferlimit @user <jumlah>` memindahkan limit antar user.
+35. `.daily` hanya bisa diklaim 1 kali per 24 jam.
+36. `.givepoin`, `.givelimit`, dan `.resetlimit` hanya owner.
+37. `.tt <link>` memproses link TikTok publik via `yt-dlp`.
+38. `.ig <link>` memproses link Instagram Reels publik via `yt-dlp`.
+39. Downloader mengurangi 1 limit hanya setelah video berhasil dikirim.
+40. Download gagal tidak mengurangi limit.
+41. File downloader dibatasi maksimal 50 MB.
+42. Welcome message berjalan saat member baru masuk.
+43. Admin grup bisa mengubah welcome message.
+44. Bot bisa dijalankan dengan PM2 di VPS Ubuntu.
+45. Error tidak membuat bot crash.
+46. Session WhatsApp tersimpan di folder `sessions/`.
 
 ---
 

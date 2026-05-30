@@ -5,6 +5,7 @@ import type { WordScramblePayload } from '../types/wordScramble.js';
 import { logger } from '../utils/logger.js';
 import { normalizeText } from '../utils/normalize.js';
 import { addWeeklyScore } from './score.service.js';
+import { incrementGamesWon } from './userStats.service.js';
 import {
   createWordScramblePayload,
   parseWordScramblePayload,
@@ -111,6 +112,10 @@ export async function answerWordScramble(params: {
       userJid: params.userJid,
       groupJid: params.groupJid,
       points: wordScramblePoint,
+    });
+    await incrementGamesWon({
+      userJid: params.userJid,
+      groupJid: params.groupJid,
     });
 
     return {

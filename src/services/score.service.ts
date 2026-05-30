@@ -1,9 +1,12 @@
 import type { WeeklyScore } from '@prisma/client';
 
 import { prisma } from '../database/prisma.js';
+import { env } from '../config/env.js';
+import { isOwner } from '../bot/permissions.js';
 import { logger } from '../utils/logger.js';
 
 const jakartaOffsetMs = 7 * 60 * 60 * 1000;
+const ownerDisplayScore = 999;
 
 export type LeaderboardEntry = {
   userJid: string;
@@ -72,6 +75,18 @@ export async function getWeeklyScore(params: {
   }
 }
 
+export async function getDisplayWeeklyScore(params: {
+  userJid: string;
+  groupJid: string;
+  now?: Date;
+}): Promise<number> {
+  if (isOwner(params.userJid)) {
+    return ownerDisplayScore;
+  }
+
+  return await getWeeklyScore(params);
+}
+
 export async function spendWeeklyScore(params: {
   userJid: string;
   groupJid: string;
@@ -138,6 +153,28 @@ export async function getWeeklyLeaderboard(params: {
     logger.error({ error, params }, 'Gagal mengambil leaderboard mingguan');
     throw error;
   }
+}
+
+export async function getDisplayWeeklyLeaderboard(params: {
+  groupJid: string;
+  limit?: number;
+  now?: Date;
+}): Promise<LeaderboardEntry[]> {
+  const ownerJid = `${env.OWNER_NUMBER}@s.whatsapp.net`;
+  const leaderboard = await getWeeklyLeaderboard({
+    ...params,
+    limit: params.limit ? params.limit + 1 : 11,
+  });
+  const withoutOwner = leaderboard.filter((entry) => !isOwner(entry.userJid));
+  const entries = [
+    {
+      userJid: ownerJid,
+      score: ownerDisplayScore,
+    },
+    ...withoutOwner,
+  ];
+
+  return entries.slice(0, params.limit ?? 10);
 }
 
 export async function resetGroupScores(groupJid: string): Promise<number> {

@@ -4,6 +4,7 @@ import { prisma } from '../database/prisma.js';
 import type { NumberGuessPayload } from '../types/numberGuess.js';
 import { logger } from '../utils/logger.js';
 import { addWeeklyScore } from './score.service.js';
+import { incrementGamesWon } from './userStats.service.js';
 import {
   createNumberGuessPayload,
   parseNumberGuessPayload,
@@ -128,6 +129,10 @@ export async function answerNumberGuess(params: {
       userJid: params.userJid,
       groupJid: params.groupJid,
       points: numberGuessPoint,
+    });
+    await incrementGamesWon({
+      userJid: params.userJid,
+      groupJid: params.groupJid,
     });
 
     return {

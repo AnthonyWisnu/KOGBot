@@ -1,6 +1,13 @@
 import { isOwner } from '../bot/permissions.js';
 import { env } from '../config/env.js';
 import type { CommandContext } from '../types/command.js';
+import { addWeeklyScore } from '../services/score.service.js';
+import {
+  addDownloadLimit,
+  resetDownloadLimit,
+} from '../services/downloadLimit.service.js';
+import { formatMention } from '../utils/format.js';
+import { getFirstMentionedJid } from '../utils/mentions.js';
 import { logger } from '../utils/logger.js';
 import {
   handleConfirmResetPointCommand,
@@ -21,6 +28,9 @@ export const ownerCommandNames = new Set([
   'listgrup',
   'resetpoin',
   'confirmresetpoin',
+  'givepoin',
+  'givelimit',
+  'resetlimit',
   'ownermenu',
 ]);
 
@@ -52,6 +62,15 @@ export async function handleOwnerCommand(context: CommandContext): Promise<void>
         return;
       case 'confirmresetpoin':
         await handleConfirmResetPointCommand(context);
+        return;
+      case 'givepoin':
+        await handleGivePoint(context);
+        return;
+      case 'givelimit':
+        await handleGiveLimit(context);
+        return;
+      case 'resetlimit':
+        await handleResetLimit(context);
         return;
       default:
         await context.reply(`Command owner tidak dikenal. Ketik ${env.BOT_PREFIX}ownermenu.`);
@@ -141,10 +160,136 @@ async function handleOwnerMenu(context: CommandContext): Promise<void> {
         `${env.BOT_PREFIX}listgroup      - Lihat daftar grup approved`,
         `${env.BOT_PREFIX}listgrup       - Alias list group`,
         `${env.BOT_PREFIX}resetpoin      - Reset poin grup dengan konfirmasi`,
+        `${env.BOT_PREFIX}givepoin @user jumlah  - Tambah poin user`,
+        `${env.BOT_PREFIX}givelimit @user jumlah - Tambah limit user`,
+        `${env.BOT_PREFIX}resetlimit @user       - Reset limit user ke 3`,
       ].join('\n'),
     );
   } catch (error) {
     logger.error({ error }, 'Gagal mengirim owner menu');
     throw error;
   }
+}
+
+async function handleGivePoint(context: CommandContext): Promise<void> {
+  try {
+    const targetJid = await getOwnerTargetJid(context);
+
+    if (!targetJid) {
+      return;
+    }
+
+    const amount = parsePositiveInteger(context.command.args.at(-1));
+
+    if (!amount) {
+      await context.reply('Gunakan .givepoin @user <jumlah>. Contoh: .givepoin @user 10');
+      return;
+    }
+
+    const score = isOwner(targetJid)
+      ? undefined
+      : await addWeeklyScore({
+          userJid: targetJid,
+          groupJid: context.chatJid,
+          points: amount,
+        });
+
+    await context.reply(
+      [
+        `Berhasil memberi ${amount} poin ke ${formatMention(targetJid)}.`,
+        `Poin user sekarang: ${score?.score ?? 999}`,
+      ].join('\n'),
+    );
+  } catch (error) {
+    logger.error({ error, chatJid: context.chatJid }, 'Gagal menjalankan command givepoin');
+    throw error;
+  }
+}
+
+async function handleGiveLimit(context: CommandContext): Promise<void> {
+  try {
+    const targetJid = await getOwnerTargetJid(context);
+
+    if (!targetJid) {
+      return;
+    }
+
+    const amount = parsePositiveInteger(context.command.args.at(-1));
+
+    if (!amount) {
+      await context.reply('Gunakan .givelimit @user <jumlah>. Contoh: .givelimit @user 5');
+      return;
+    }
+
+    const currentLimit = await addDownloadLimit({
+      userJid: targetJid,
+      groupJid: context.chatJid,
+      amount,
+    });
+
+    await context.reply(
+      [
+        `Berhasil memberi ${amount} limit ke ${formatMention(targetJid)}.`,
+        `Limit user sekarang: ${currentLimit}`,
+      ].join('\n'),
+    );
+  } catch (error) {
+    logger.error({ error, chatJid: context.chatJid }, 'Gagal menjalankan command givelimit');
+    throw error;
+  }
+}
+
+async function handleResetLimit(context: CommandContext): Promise<void> {
+  try {
+    const targetJid = await getOwnerTargetJid(context);
+
+    if (!targetJid) {
+      return;
+    }
+
+    const currentLimit = await resetDownloadLimit({
+      userJid: targetJid,
+      groupJid: context.chatJid,
+    });
+
+    await context.reply(
+      [
+        `Limit ${formatMention(targetJid)} sudah direset.`,
+        `Limit user sekarang: ${currentLimit}`,
+      ].join('\n'),
+    );
+  } catch (error) {
+    logger.error({ error, chatJid: context.chatJid }, 'Gagal menjalankan command resetlimit');
+    throw error;
+  }
+}
+
+async function getOwnerTargetJid(context: CommandContext): Promise<string | undefined> {
+  if (!context.isGroup) {
+    await context.reply('Command ini hanya bisa digunakan di grup.');
+    return undefined;
+  }
+
+  const targetJid = getFirstMentionedJid(context.message.message);
+
+  if (!targetJid) {
+    await context.reply('Target user wajib di-mention.');
+    return undefined;
+  }
+
+  return targetJid;
+}
+
+function parsePositiveInteger(value: string | undefined): number | undefined {
+  if (!value || !/^\d+$/.test(value)) {
+    return undefined;
+  }
+
+  const amount = Number(value);
+
+  if (!Number.isSafeInteger(amount) || amount <= 0) {
+    return undefined;
+  }
+
+  return amount;
 }

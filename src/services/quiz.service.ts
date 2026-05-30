@@ -2,6 +2,7 @@ import { GameType, type ActiveGame, type QuizQuestion } from '@prisma/client';
 
 import { prisma } from '../database/prisma.js';
 import { addWeeklyScore } from './score.service.js';
+import { incrementGamesWon } from './userStats.service.js';
 import { normalizeText } from '../utils/normalize.js';
 import { logger } from '../utils/logger.js';
 
@@ -117,6 +118,10 @@ export async function answerMathQuiz(params: {
       userJid: params.userJid,
       groupJid: params.groupJid,
       points: quizPoint,
+    });
+    await incrementGamesWon({
+      userJid: params.userJid,
+      groupJid: params.groupJid,
     });
 
     return {

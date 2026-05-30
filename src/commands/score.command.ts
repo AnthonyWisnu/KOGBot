@@ -1,6 +1,6 @@
 import {
-  getWeeklyLeaderboard,
-  getWeeklyScore,
+  getDisplayWeeklyLeaderboard,
+  getDisplayWeeklyScore,
 } from '../services/score.service.js';
 import type { CommandContext } from '../types/command.js';
 import { formatMention } from '../utils/format.js';
@@ -13,7 +13,7 @@ export async function handlePointCommand(context: CommandContext): Promise<void>
       return;
     }
 
-    const score = await getWeeklyScore({
+    const score = await getDisplayWeeklyScore({
       userJid: context.senderJid,
       groupJid: context.chatJid,
     });
@@ -32,7 +32,7 @@ export async function handleRankCommand(context: CommandContext): Promise<void> 
       return;
     }
 
-    const leaderboard = await getWeeklyLeaderboard({
+    const leaderboard = await getDisplayWeeklyLeaderboard({
       groupJid: context.chatJid,
       limit: 10,
     });

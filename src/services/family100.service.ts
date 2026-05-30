@@ -11,6 +11,7 @@ import type {
   Family100Payload,
 } from '../types/family100.js';
 import { addWeeklyScore } from './score.service.js';
+import { incrementGamesWon } from './userStats.service.js';
 import {
   createFamily100Payload,
   parseFamily100Payload,
@@ -170,6 +171,10 @@ export async function answerFamily100(params: {
             type: GameType.FAMILY100,
           },
         },
+      });
+      await incrementGamesWon({
+        userJid: params.userJid,
+        groupJid: params.groupJid,
       });
     } else {
       await prisma.activeGame.update({

@@ -879,6 +879,243 @@ Acceptance Criteria:
 
 ---
 
+## Tahap 30 - Owner Unlimited Mode (Selesai)
+
+Tujuan:
+
+Membuat owner selalu dianggap memiliki poin dan limit unlimited tanpa menyimpan angka 999 permanen di database.
+
+Pekerjaan:
+
+- Audit helper owner existing di `src/bot/permissions.ts`.
+- Pastikan helper `isOwner(jid: string): boolean` memakai `OWNER_NUMBER` dari `.env`.
+- Tambahkan override pembacaan data owner:
+  - poin owner tampil 999
+  - limit owner tampil 999
+- Integrasikan owner unlimited ke:
+  - `.poin`
+  - `.limit`
+  - `.rank`
+  - `.belilimit`
+  - downloader `.tt` dan `.ig`
+- Downloader owner tidak boleh mengurangi limit.
+- `.belilimit` untuk owner membalas:
+  - `Owner sudah memiliki limit unlimited.`
+- Jangan update database untuk membuat nilai owner menjadi 999.
+
+Verifikasi:
+
+- Owner melihat 999 poin.
+- Owner melihat 999 limit.
+- Owner bisa download walau limit database 0.
+- Limit owner tidak berkurang setelah download sukses atau gagal.
+- `.belilimit` owner ditolak dengan pesan unlimited.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.
+
+---
+
+## Tahap 31 - Profile System dan User Stats (Selesai)
+
+Tujuan:
+
+Menambahkan command profil user untuk melihat poin, limit, rank, dan jumlah kemenangan game.
+
+Pekerjaan:
+
+- Tambahkan data user stats di Prisma:
+  - `gamesWon`
+  - `lastDailyClaim`
+- Tentukan apakah stats masuk model `User` atau model baru sesuai struktur existing.
+- Buat migration Prisma.
+- Buat service profile:
+  - ambil poin user
+  - ambil limit user
+  - hitung rank user di grup
+  - ambil jumlah game menang
+  - apply override owner 999 poin dan 999 limit
+- Implementasi command:
+  - `.profile`
+  - `.profile @user`
+- Ambil target user dari mention jika ada.
+- Jika target owner:
+  - poin 999
+  - limit 999
+  - rank `Owner`
+- Tambahkan tracking `gamesWon` saat user menang:
+  - Kuis MTK benar
+  - Family 100 selesai sesuai aturan jika relevan
+  - Tebak Kata benar
+  - Tebak Emoji benar
+  - Tebak Angka benar
+  - Tic Tac Toe menang
+
+Verifikasi:
+
+- `.profile` menampilkan profil pengirim.
+- `.profile @user` menampilkan profil target.
+- Profile owner menampilkan 999 poin, 999 limit, dan rank Owner.
+- Game menang menambah `gamesWon`.
+- Migration SQL `20260530223000_user_stats` tersedia.
+- `npx prisma db push` lokal berhasil tanpa reset database.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.
+
+---
+
+## Tahap 32 - Transfer Limit (Selesai)
+
+Tujuan:
+
+User bisa transfer limit download ke user lain melalui mention.
+
+Pekerjaan:
+
+- Buat service transfer limit.
+- Implementasi command:
+  - `.transferlimit @user 1`
+- Validasi:
+  - wajib mention target
+  - jumlah wajib angka
+  - minimal 1
+  - tidak boleh transfer ke diri sendiri
+  - user biasa hanya bisa transfer jika limit cukup
+- Penerima bertambah limit.
+- Pengirim user biasa berkurang limit.
+- Owner bisa transfer berapa pun tanpa limit berkurang.
+- Tambahkan command ke router dan menu.
+
+Verifikasi:
+
+- Transfer user biasa sukses jika limit cukup.
+- Transfer user biasa gagal jika limit kurang.
+- Transfer ke diri sendiri ditolak.
+- Transfer 0, negatif, atau bukan angka ditolak.
+- Owner transfer limit sukses tanpa limit owner berkurang.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.
+
+---
+
+## Tahap 33 - Daily Reward (Selesai)
+
+Tujuan:
+
+Menambahkan hadiah harian yang bisa diklaim 1 kali setiap 24 jam.
+
+Pekerjaan:
+
+- Gunakan field `lastDailyClaim` dari user stats.
+- Buat service daily reward.
+- Implementasi command:
+  - `.daily`
+- Reward random:
+  - 5 poin
+  - 10 poin
+  - 15 poin
+  - 1 limit
+  - 2 limit
+- Jika belum pernah claim atau sudah lewat 24 jam, reward diberikan dan waktu claim disimpan.
+- Jika belum 24 jam, balas:
+  - `Kamu sudah claim hari ini.`
+  - `Coba lagi dalam X jam Y menit.`
+- Owner tetap boleh claim, tetapi poin/limit tampil owner tetap override 999.
+
+Verifikasi:
+
+- `.daily` memberi salah satu reward.
+- `.daily` kedua sebelum 24 jam ditolak dengan sisa waktu.
+- Setelah 24 jam bisa klaim lagi.
+- Reward poin menambah poin.
+- Reward limit menambah limit.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.
+
+---
+
+## Tahap 34 - Owner Give Poin, Give Limit, dan Reset Limit (Selesai)
+
+Tujuan:
+
+Menambahkan command owner untuk memberi poin, memberi limit, dan reset limit user.
+
+Pekerjaan:
+
+- Implementasi command owner:
+  - `.givepoin @user 10`
+  - `.givelimit @user 5`
+  - `.resetlimit @user`
+- Validasi semua command:
+  - owner only
+  - wajib mention target
+  - jumlah minimal 1 untuk give
+- `.givepoin` menambah poin target.
+- `.givelimit` menambah limit target.
+- `.resetlimit` mengembalikan limit target ke default 3.
+- Jika user target tidak ditemukan atau belum ada data yang relevan, balas pesan jelas.
+- Tambahkan command ke owner router dan owner menu.
+
+Verifikasi:
+
+- Non-owner tidak bisa menjalankan command.
+- Owner bisa memberi poin.
+- Owner bisa memberi limit.
+- Owner bisa reset limit user menjadi 3.
+- Jumlah 0, negatif, atau bukan angka ditolak.
+- Target tanpa mention ditolak.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.
+
+---
+
+## Tahap 35 - Menu, Dokumentasi, dan Acceptance Test Fitur Lanjutan (Selesai)
+
+Tujuan:
+
+Menyatukan fitur dari `Codex.md` ke menu, dokumentasi, dan acceptance test akhir.
+
+Pekerjaan:
+
+- Update `.menu`:
+  - PROFIL:
+    - `.profile`
+    - `.profile @user`
+  - REWARD:
+    - `.daily`
+  - LIMIT:
+    - `.transferlimit @user jumlah`
+- Update `.ownermenu`:
+  - `.givepoin @user jumlah`
+  - `.givelimit @user jumlah`
+  - `.resetlimit @user`
+- Pastikan command owner hanya muncul di owner menu, bukan menu member umum.
+- Update `README.md` dengan fitur baru.
+- Update `AGENT.md` dengan aturan owner unlimited, profile, daily, transfer limit, dan owner tools.
+- Buat acceptance test otomatis untuk service yang bisa diuji lokal.
+- Buat daftar manual test WhatsApp live.
+
+Acceptance Criteria:
+
+- Owner selalu tampil 999 poin.
+- Owner selalu tampil 999 limit.
+- Downloader tidak mengurangi limit owner.
+- `.profile` berjalan.
+- `.profile @user` berjalan.
+- `.transferlimit` berjalan.
+- Owner transfer limit tanpa mengurangi limit owner.
+- `.daily` hanya bisa digunakan sekali per 24 jam.
+- `.givepoin` hanya owner.
+- `.givelimit` hanya owner.
+- `.resetlimit` hanya owner.
+- Migrasi Prisma berhasil.
+- TypeScript build berhasil.
+- Tidak ada fitur lama yang rusak.
+- Semua command muncul di menu sesuai role.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.
+
+---
+
 ## Catatan Kerja untuk Codex
 
 Saat mengerjakan tahap manapun:

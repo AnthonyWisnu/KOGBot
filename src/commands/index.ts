@@ -9,6 +9,7 @@ import {
   handlePointCommand,
   handleRankCommand,
 } from './score.command.js';
+import { handleProfileCommand } from './profile.command.js';
 import {
   handleQuizCommand,
   handleQuizSurrender,
@@ -49,6 +50,8 @@ import {
   handleBuyLimitCommand,
   handleLimitCommand,
 } from './downloadLimit.command.js';
+import { handleTransferLimitCommand } from './transferLimit.command.js';
+import { handleDailyCommand } from './daily.command.js';
 import { logger } from '../utils/logger.js';
 
 const unknownCommandMessage = `Command tidak dikenal. Ketik ${env.BOT_PREFIX}menu untuk melihat daftar fitur.`;
@@ -57,8 +60,11 @@ const commandHandlers = new Map<string, CommandHandler>([
   ['menu', handleMenuCommand],
   ['poin', handlePointCommand],
   ['rank', handleRankCommand],
+  ['profile', handleProfileCommand],
   ['limit', handleLimitCommand],
   ['belilimit', handleBuyLimitCommand],
+  ['transferlimit', handleTransferLimitCommand],
+  ['daily', handleDailyCommand],
   ['kuis', handleQuizCommand],
   ['family100', handleFamily100Command],
   ['tebakkata', handleWordScrambleCommand],

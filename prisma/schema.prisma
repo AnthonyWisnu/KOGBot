@@ -51,6 +51,19 @@ model UserDownloadLimit {
   @@index([groupJid])
 }
 
+model UserStats {
+  id             String    @id @default(cuid())
+  userJid        String
+  groupJid       String
+  gamesWon       Int       @default(0)
+  lastDailyClaim DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([userJid, groupJid])
+  @@index([groupJid])
+}
+
 model ActiveGame {
   id                  String   @id @default(cuid())
   groupJid            String

@@ -3,6 +3,7 @@ import {
   getDownloadLimitStatus,
 } from '../services/downloadLimit.service.js';
 import type { CommandContext } from '../types/command.js';
+import { isOwner } from '../bot/permissions.js';
 import { logger } from '../utils/logger.js';
 
 export async function handleLimitCommand(context: CommandContext): Promise<void> {
@@ -36,6 +37,11 @@ export async function handleBuyLimitCommand(context: CommandContext): Promise<vo
       return;
     }
 
+    if (isOwner(context.senderJid)) {
+      await context.reply('Owner sudah memiliki limit unlimited.');
+      return;
+    }
+
     const amount = parseLimitAmount(context.command.args[0]);
 
     if (!amount) {
@@ -48,6 +54,11 @@ export async function handleBuyLimitCommand(context: CommandContext): Promise<vo
       groupJid: context.chatJid,
       amount,
     });
+
+    if (result.status === 'owner_unlimited') {
+      await context.reply('Owner sudah memiliki limit unlimited.');
+      return;
+    }
 
     if (result.status === 'insufficient_points') {
       await context.reply(

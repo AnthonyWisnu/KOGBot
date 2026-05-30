@@ -9,6 +9,7 @@ import type {
 import { isSameUserJid } from '../utils/jid.js';
 import { logger } from '../utils/logger.js';
 import { addWeeklyScore } from './score.service.js';
+import { incrementGamesWon } from './userStats.service.js';
 import {
   createTicTacToePayload,
   parseTicTacToePayload,
@@ -179,17 +180,22 @@ export async function playTicTacToeMove(params: {
     const winner = getWinner(nextPayload.board);
 
     if (winner) {
+      const winnerJid = getPlayerJid(nextPayload, winner);
       await endTicTacToe(params.groupJid);
       await addWeeklyScore({
-        userJid: getPlayerJid(nextPayload, winner),
+        userJid: winnerJid,
         groupJid: params.groupJid,
         points: winPoint,
+      });
+      await incrementGamesWon({
+        userJid: winnerJid,
+        groupJid: params.groupJid,
       });
 
       return {
         status: 'win',
         payload: nextPayload,
-        winnerJid: getPlayerJid(nextPayload, winner),
+        winnerJid,
         points: winPoint,
       };
     }
@@ -274,6 +280,10 @@ export async function surrenderTicTacToe(params: {
       userJid: winnerJid,
       groupJid: params.groupJid,
       points: winPoint,
+    });
+    await incrementGamesWon({
+      userJid: winnerJid,
+      groupJid: params.groupJid,
     });
 
     return {

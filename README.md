@@ -13,13 +13,18 @@ KOGBot adalah project bot WhatsApp berbasis Node.js dan TypeScript untuk grup pr
 - Tebak Angka
 - Tic Tac Toe
 - Poin grup dan leaderboard
+- Profile user, jumlah kemenangan game, dan rank
 - Welcome member baru dan pesan perpisahan member keluar
 - Downloader TikTok publik via `yt-dlp`
 - Downloader Instagram Reels publik via `yt-dlp`
 - Gambar jadi sticker dengan reply `.s`
 - Sticker jadi gambar dengan reply `.gambar`
 - Limit downloader per user per grup
+- Transfer limit antar user
+- Daily reward 1 kali per 24 jam
+- Owner unlimited poin dan limit
 - Reset poin manual oleh owner dengan konfirmasi
+- Owner tools untuk give poin, give limit, dan reset limit
 
 ## Setup Lokal
 
@@ -163,6 +168,7 @@ pm2 restart kogbot
 - Downloader hanya mendukung TikTok publik dan Instagram Reels publik.
 - Instagram Story dan Instagram private tidak didukung.
 - Setiap download sukses memakai 1 limit. Download gagal tidak mengurangi limit.
+- Owner selalu tampil memiliki 999 poin dan 999 limit tanpa menyimpan nilai 999 permanen di database.
 - Poin tidak direset otomatis. Reset poin hanya manual oleh owner dengan `.resetpoin` lalu `.confirmresetpoin`.
 
 ## Manual Test WhatsApp Live
@@ -175,8 +181,12 @@ Jalankan setelah bot berhasil login dan masuk ke grup uji:
 4. Jalankan `.nyerah kuis`, `.nyerah family100`, `.nyerah tebakkata`, `.nyerah tebakemoji`, `.nyerah tebakangka`, dan `.nyerah tictactoe`.
 5. Reply pesan game aktif dengan teks persis `nyerah`. Pastikan teks seperti `aku nyerah` diabaikan.
 6. Cek `.limit`, lalu `.belilimit <jumlah>` dengan poin cukup dan tidak cukup.
-7. Test `.tt <link>` dan `.ig <link>` publik. Pastikan limit hanya berkurang setelah video berhasil dikirim.
-8. Reply gambar dengan `.s`, lalu reply sticker dengan `.gambar`.
-9. Aktifkan `.welcome on`, lalu test member masuk dan keluar.
-10. Owner menjalankan `.resetpoin`, lalu `.confirmresetpoin` dalam 30 detik.
-11. Cek `pm2 logs kogbot` dan pastikan tidak ada crash.
+7. Cek `.profile`, lalu `.profile @user`. Pastikan owner tampil 999 poin, 999 limit, dan rank Owner.
+8. Jalankan `.transferlimit @user 1`. Pastikan pengirim berkurang dan penerima bertambah.
+9. Jalankan `.daily` dua kali. Klaim pertama berhasil, klaim kedua menampilkan sisa waktu.
+10. Test `.tt <link>` dan `.ig <link>` publik. Pastikan limit hanya berkurang setelah video berhasil dikirim.
+11. Reply gambar dengan `.s`, lalu reply sticker dengan `.gambar`.
+12. Aktifkan `.welcome on`, lalu test member masuk dan keluar.
+13. Owner menjalankan `.resetpoin`, lalu `.confirmresetpoin` dalam 30 detik.
+14. Owner menjalankan `.givepoin @user 10`, `.givelimit @user 5`, dan `.resetlimit @user`.
+15. Cek `pm2 logs kogbot` dan pastikan tidak ada crash.
