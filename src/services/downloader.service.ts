@@ -1,6 +1,9 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+import { createWriteStream } from 'node:fs';
 import { access, readdir, stat } from 'node:fs/promises';
+import { Transform, type TransformCallback } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 
 import { env } from '../config/env.js';
 import {
@@ -14,15 +17,36 @@ import {
 import { logger } from '../utils/logger.js';
 
 const bytesPerMb = 1024 * 1024;
+const requestTimeoutMs = 30000;
 
 type DownloadedVideo = {
   filePath: string;
   title?: string;
 };
 
+type TikwmResponse = {
+  code?: number;
+  msg?: string;
+  data?: {
+    title?: string;
+    play?: string;
+    wmplay?: string;
+    hdplay?: string;
+  };
+};
+
 export async function downloadTikTokVideo(url: string): Promise<DownloadedVideo> {
   try {
     assertTikTokUrl(url);
+
+    const tikwmResult = await downloadTikTokWithTikwm(url).catch((error: unknown) => {
+      logger.warn({ error, url }, 'TikWM gagal, mencoba yt-dlp untuk TikTok');
+      return undefined;
+    });
+
+    if (tikwmResult) {
+      return tikwmResult;
+    }
 
     return await downloadWithYtDlp(url);
   } catch (error) {
@@ -38,6 +62,69 @@ export async function downloadInstagramReelVideo(url: string): Promise<Downloade
     return await downloadWithYtDlp(url);
   } catch (error) {
     logger.error({ error, url }, 'Gagal download video Instagram');
+    throw error;
+  }
+}
+
+async function downloadTikTokWithTikwm(url: string): Promise<DownloadedVideo> {
+  const apiUrl = new URL('https://www.tikwm.com/api/');
+  apiUrl.searchParams.set('url', url);
+  const response = await fetch(apiUrl, {
+    signal: AbortSignal.timeout(requestTimeoutMs),
+  });
+
+  if (!response.ok) {
+    throw new Error(`TikWM HTTP ${response.status}`);
+  }
+
+  const body = await response.json() as TikwmResponse;
+  const videoUrl = body.data?.play ?? body.data?.hdplay ?? body.data?.wmplay;
+
+  if (body.code !== 0 || !videoUrl) {
+    throw new Error(body.msg ?? 'TikWM tidak mengembalikan video');
+  }
+
+  return {
+    filePath: await downloadRemoteVideo(videoUrl),
+    title: body.data?.title,
+  };
+}
+
+async function downloadRemoteVideo(url: string): Promise<string> {
+  let filePath: string | undefined;
+
+  try {
+    const maxBytes = env.MAX_DOWNLOAD_MB * bytesPerMb;
+    filePath = await createTempFilePath('.mp4');
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+      },
+      signal: AbortSignal.timeout(requestTimeoutMs),
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error(`Download HTTP ${response.status}`);
+    }
+
+    const contentLength = Number(response.headers.get('content-length'));
+
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+      throw new Error('File terlalu besar');
+    }
+
+    await pipeline(
+      response.body,
+      new SizeLimitTransform(maxBytes),
+      createWriteStream(filePath),
+    );
+
+    return filePath;
+  } catch (error) {
+    if (filePath) {
+      await removeTempFile(filePath);
+    }
+
     throw error;
   }
 }
@@ -70,6 +157,29 @@ async function downloadWithYtDlp(url: string): Promise<DownloadedVideo> {
     }
 
     throw error;
+  }
+}
+
+class SizeLimitTransform extends Transform {
+  private totalBytes = 0;
+
+  public constructor(private readonly maxBytes: number) {
+    super();
+  }
+
+  public override _transform(
+    chunk: Buffer,
+    _encoding: BufferEncoding,
+    callback: TransformCallback,
+  ): void {
+    this.totalBytes += chunk.length;
+
+    if (this.totalBytes > this.maxBytes) {
+      callback(new Error('File terlalu besar'));
+      return;
+    }
+
+    callback(null, chunk);
   }
 }
 
