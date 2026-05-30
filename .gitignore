@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+*.log
+dev.db
+dev.db-journal
+prisma/dev.db
+prisma/dev.db-journal
+sessions/*
+!sessions/.gitkeep
+temp/*
+!temp/.gitkeep

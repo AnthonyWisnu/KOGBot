@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  jid       String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Group {
+  id             String   @id @default(cuid())
+  jid            String   @unique
+  name           String?
+  isApproved     Boolean  @default(false)
+  welcomeEnabled Boolean  @default(false)
+  welcomeMessage String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model WeeklyScore {
+  id        String   @id @default(cuid())
+  userJid   String
+  groupJid  String
+  score     Int      @default(0)
+  weekStart DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userJid, groupJid, weekStart])
+  @@index([groupJid, weekStart])
+}
+
+model UserDownloadLimit {
+  id        String   @id @default(cuid())
+  userJid   String
+  groupJid  String
+  limit     Int      @default(3)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userJid, groupJid])
+  @@index([groupJid])
+}
+
+model ActiveGame {
+  id                  String   @id @default(cuid())
+  groupJid            String
+  type                GameType
+  payload             String
+  startedBy           String
+  messageId           String?
+  lastPromptMessageId String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([groupJid, type])
+  @@index([groupJid, messageId])
+  @@index([groupJid, lastPromptMessageId])
+}
+
+model QuizQuestion {
+  id            String   @id @default(cuid())
+  category      String   @default("MTK")
+  level         String
+  question      String
+  optionA       String
+  optionB       String
+  optionC       String
+  optionD       String
+  correctOption String
+  explanation   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Family100Question {
+  id        String            @id @default(cuid())
+  question  String
+  answers   Family100Answer[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+}
+
+model Family100Answer {
+  id               String            @id @default(cuid())
+  questionId       String
+  question         Family100Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answer           String
+  normalizedAnswer String
+  points           Int
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([questionId])
+  @@index([normalizedAnswer])
+}
+
+model WordScrambleQuestion {
+  id               String   @id @default(cuid())
+  category         String
+  answer           String
+  normalizedAnswer String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([category])
+  @@index([normalizedAnswer])
+}
+
+model EmojiGuessQuestion {
+  id               String   @id @default(cuid())
+  emoji            String
+  answer           String
+  normalizedAnswer String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([normalizedAnswer])
+}
+
+enum GameType {
+  QUIZ_MTK
+  FAMILY100
+  WORD_SCRAMBLE
+  EMOJI_GUESS
+  NUMBER_GUESS
+  TICTACTOE
+}
