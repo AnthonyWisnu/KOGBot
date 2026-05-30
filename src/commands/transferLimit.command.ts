@@ -1,7 +1,10 @@
 import { transferDownloadLimit } from '../services/transferLimit.service.js';
 import type { CommandContext } from '../types/command.js';
 import { formatMention } from '../utils/format.js';
-import { resolveFirstMentionedJid } from '../utils/mentions.js';
+import {
+  getMentionLabelFromText,
+  resolveFirstMentionedJid,
+} from '../utils/mentions.js';
 import { logger } from '../utils/logger.js';
 
 export async function handleTransferLimitCommand(context: CommandContext): Promise<void> {
@@ -22,6 +25,7 @@ export async function handleTransferLimitCommand(context: CommandContext): Promi
       return;
     }
 
+    const recipientLabel = getMentionLabelFromText(context.command.rawArgs) ?? formatMention(recipientJid);
     const amount = parsePositiveInteger(context.command.args.at(-1));
 
     if (!amount) {
@@ -51,12 +55,17 @@ export async function handleTransferLimitCommand(context: CommandContext): Promi
       return;
     }
 
-    await context.reply(
-      [
-        `Berhasil transfer ${result.transferred} limit ke ${formatMention(recipientJid)}.`,
-        `Limit kamu sekarang: ${result.senderLimit}`,
-        `Limit penerima sekarang: ${result.recipientLimit}`,
-      ].join('\n'),
+    await context.socket.sendMessage(
+      context.chatJid,
+      {
+        text: [
+          `Berhasil transfer ${result.transferred} limit ke ${recipientLabel}.`,
+          `Limit kamu sekarang: ${result.senderLimit}`,
+          `Limit penerima sekarang: ${result.recipientLimit}`,
+        ].join('\n'),
+        mentions: [recipientJid],
+      },
+      { quoted: context.message },
     );
   } catch (error) {
     logger.error(

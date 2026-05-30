@@ -2,7 +2,10 @@ import { env } from '../config/env.js';
 import { getUserProfile } from '../services/profile.service.js';
 import type { CommandContext } from '../types/command.js';
 import { formatMention } from '../utils/format.js';
-import { resolveFirstMentionedJid } from '../utils/mentions.js';
+import {
+  getMentionLabelFromText,
+  resolveFirstMentionedJid,
+} from '../utils/mentions.js';
 import { logger } from '../utils/logger.js';
 
 export async function handleProfileCommand(context: CommandContext): Promise<void> {
@@ -17,24 +20,30 @@ export async function handleProfileCommand(context: CommandContext): Promise<voi
       groupJid: context.chatJid,
       message: context.message.message,
     }) ?? context.senderJid;
+    const targetLabel = getMentionLabelFromText(context.command.rawArgs) ?? formatMention(targetJid);
     const profile = await getUserProfile({
       userJid: targetJid,
       groupJid: context.chatJid,
     });
     const rankText = profile.rank ?? '-';
 
-    await context.reply(
-      [
-        '*Profile MinjiBot*',
-        '',
-        `User: ${formatMention(profile.userJid)}`,
-        `Poin: ${profile.points}`,
-        `Limit: ${profile.limit}`,
-        `Rank: ${rankText}`,
-        `Menang game: ${profile.gamesWon}`,
-        '',
-        `_Gunakan ${env.BOT_PREFIX}profile @user untuk cek member lain._`,
-      ].join('\n'),
+    await context.socket.sendMessage(
+      context.chatJid,
+      {
+        text: [
+          '*Profile MinjiBot*',
+          '',
+          `User: ${targetLabel}`,
+          `Poin: ${profile.points}`,
+          `Limit: ${profile.limit}`,
+          `Rank: ${rankText}`,
+          `Menang game: ${profile.gamesWon}`,
+          '',
+          `_Gunakan ${env.BOT_PREFIX}profile @user untuk cek member lain._`,
+        ].join('\n'),
+        mentions: [profile.userJid],
+      },
+      { quoted: context.message },
     );
   } catch (error) {
     logger.error(

@@ -43,6 +43,16 @@ export async function resolveFirstMentionedJid(params: {
   });
 }
 
+export function getMentionLabelFromText(text: string): string | undefined {
+  const mentionStart = text.indexOf('@');
+
+  if (mentionStart < 0) {
+    return undefined;
+  }
+
+  return text.slice(mentionStart).trim().replace(/\s+\d+$/, '').trim();
+}
+
 export async function resolveGroupParticipantJid(params: {
   socket: WASocket;
   groupJid: string;
