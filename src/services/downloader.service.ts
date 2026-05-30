@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
-import { stat } from 'node:fs/promises';
+import path from 'node:path';
+import { access, readdir, stat } from 'node:fs/promises';
 
 import { env } from '../config/env.js';
 import {
@@ -45,11 +46,13 @@ async function downloadWithYtDlp(url: string): Promise<DownloadedVideo> {
   let filePath: string | undefined;
 
   try {
-    filePath = await createTempFilePath('.mp4');
-    const title = await runYtDlp({
+    const tempBasePath = await createTempFilePath('.download');
+    const outputTemplate = `${tempBasePath.slice(0, -'.download'.length)}.%(ext)s`;
+    const result = await runYtDlp({
       url,
-      outputPath: filePath,
+      outputTemplate,
     });
+    filePath = result.filePath ?? await findDownloadedFile(outputTemplate);
 
     const fileStats = await stat(filePath);
 
@@ -59,7 +62,7 @@ async function downloadWithYtDlp(url: string): Promise<DownloadedVideo> {
 
     return {
       filePath,
-      title,
+      title: result.title,
     };
   } catch (error) {
     if (filePath) {
@@ -72,8 +75,8 @@ async function downloadWithYtDlp(url: string): Promise<DownloadedVideo> {
 
 function runYtDlp(params: {
   url: string;
-  outputPath: string;
-}): Promise<string | undefined> {
+  outputTemplate: string;
+}): Promise<{ filePath?: string; title?: string }> {
   return new Promise((resolve, reject) => {
     const args = [
       '--no-playlist',
@@ -91,8 +94,10 @@ function runYtDlp(params: {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36',
       '--print',
       'title',
+      '--print',
+      'after_move:filepath',
       '-o',
-      params.outputPath,
+      params.outputTemplate,
     ];
 
     if (env.YTDLP_COOKIES_FILE) {
@@ -121,13 +126,45 @@ function runYtDlp(params: {
       const stderr = Buffer.concat(stderrChunks).toString('utf8').trim();
 
       if (code === 0) {
-        resolve(stdout ? stdout.split('\n')[0] : undefined);
+        resolve(parseYtDlpOutput(stdout));
         return;
       }
 
       reject(createYtDlpExitError(stderr, code));
     });
   });
+}
+
+function parseYtDlpOutput(stdout: string): { filePath?: string; title?: string } {
+  const lines = stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const filePath = [...lines].reverse().find((line) => {
+    return /\.(mp4|mkv|webm|mov)$/i.test(line);
+  });
+  const title = lines.find((line) => line !== filePath);
+
+  return {
+    filePath,
+    title,
+  };
+}
+
+async function findDownloadedFile(outputTemplate: string): Promise<string> {
+  const directory = path.dirname(outputTemplate);
+  const prefix = path.basename(outputTemplate).replace('.%(ext)s', '.');
+  const files = await readdir(directory);
+  const matchedFile = files.find((file) => file.startsWith(prefix));
+
+  if (!matchedFile) {
+    throw new Error('yt-dlp tidak menghasilkan file video');
+  }
+
+  const filePath = path.join(directory, matchedFile);
+  await access(filePath);
+
+  return filePath;
 }
 
 function normalizeYtDlpError(error: Error): Error {
