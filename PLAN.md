@@ -1126,3 +1126,513 @@ Saat mengerjakan tahap manapun:
 - Setelah edit, jalankan verifikasi yang relevan.
 - Jika ada tahap yang belum bisa diuji penuh karena butuh WhatsApp live, catat sebagai manual verification.
 - Jangan membuat fitur tambahan tanpa instruksi baru.
+
+---
+
+## Tahap 36 - PLAN Moderasi Grup
+
+Tujuan:
+
+Menambahkan rencana teknis fitur moderasi grup untuk MinjiBot/KOGBot sebelum coding dimulai.
+
+Ringkasan fitur:
+
+- `.kick @user`
+- `.promote @user`
+- `.demote @user`
+- `.tagall <pesan>`
+- `.antilink on`
+- `.antilink off`
+
+Catatan penting:
+
+- Tahap ini hanya perencanaan.
+- Coding fitur moderasi dimulai setelah plan disetujui.
+- Tidak membuat hidden tag.
+- Tidak membuat anti link semua domain.
+- Tidak membuat warning system.
+- Tidak membuat `.warnlist`.
+- Tidak membuat `.clearwarn`.
+
+Analisis struktur project existing:
+
+- Permission owner sudah ada di `src/bot/permissions.ts` melalui `isOwner`.
+- Permission admin grup sudah ada di `src/bot/permissions.ts` melalui `isGroupAdmin`.
+- Command router utama ada di `src/commands/index.ts`.
+- Command owner existing ada di `src/commands/owner.command.ts`.
+- Menu umum ada di `src/commands/menu.command.ts`.
+- Context command memakai `CommandContext` dari `src/types/command.ts`.
+- Group whitelist dan data grup ada di `src/services/group.service.ts`.
+- Prisma schema ada di `prisma/schema.prisma`.
+- Pesan biasa diproses di `src/bot/messageHandler.ts`, ini nanti dipakai untuk deteksi anti link.
+- Helper mention existing ada di `src/utils/mentions.ts`.
+- Helper JID existing ada di `src/utils/jid.ts`.
+
+File yang akan dibuat:
+
+- `src/services/moderation.service.ts`
+  - Logika kick, promote, demote.
+  - Helper cek role target dan pelaksana.
+  - Wrapper Baileys `groupParticipantsUpdate`.
+- `src/commands/moderation.command.ts`
+  - Handler `.kick`, `.promote`, `.demote`, `.tagall`, `.antilink`.
+  - Validasi input command dan pesan user.
+- `src/services/tagAll.service.ts`
+  - Ambil metadata grup.
+  - Batasi mention maksimal 100.
+  - Cooldown 10 menit per grup di memory.
+- `src/services/antiLink.service.ts`
+  - Cek status anti link grup.
+  - Deteksi link undangan grup WhatsApp.
+  - Eksekusi hapus pesan dan kick member biasa.
+- `src/utils/groupMetadata.ts`
+  - Helper baca participant, role admin, dan JID bot dari metadata jika perlu.
+
+File yang akan diubah:
+
+- `prisma/schema.prisma`
+  - Tambah field `antiLinkEnabled Boolean @default(false)` pada model `Group`.
+- `prisma/migrations/.../migration.sql`
+  - Tambah migration untuk field `antiLinkEnabled`.
+- `src/services/group.service.ts`
+  - Tambah getter/setter status anti link per grup.
+- `src/commands/index.ts`
+  - Daftarkan command `.kick`, `.promote`, `.demote`, `.tagall`, `.antilink`.
+- `src/commands/menu.command.ts`
+  - Tambahkan kategori `MODERASI`.
+- `src/bot/messageHandler.ts`
+  - Tambahkan flow anti link sebelum command/plain game diproses.
+- `src/types/command.ts`
+  - Ubah hanya jika perlu menambah helper reply khusus.
+- `README.md`
+  - Tambah dokumentasi fitur moderasi dan manual test.
+- `AGENT.md`
+  - Tambah aturan moderasi, anti link, dan larangan hidden tag.
+- `.env.example`
+  - Tidak perlu env baru kecuali nanti ditemukan kebutuhan khusus.
+
+Perubahan Prisma schema:
+
+```prisma
+model Group {
+  id              String   @id @default(cuid())
+  jid             String   @unique
+  name            String?
+  isApproved      Boolean  @default(false)
+  welcomeEnabled  Boolean  @default(false)
+  welcomeMessage  String?
+  antiLinkEnabled Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+```
+
+Strategi cooldown `.tagall`:
+
+- Cooldown disimpan di memory dengan `Map<string, number>`.
+- Key memakai `groupJid`.
+- Durasi 10 menit.
+- Alasan tidak persistent:
+  - Cooldown hanya proteksi spam ringan.
+  - Jika bot restart, cooldown reset masih aman.
+  - Tidak perlu menambah tabel hanya untuk cooldown sementara.
+
+Flow permission umum:
+
+- Semua command moderasi hanya berjalan di grup.
+- Bot wajib menjadi admin grup untuk:
+  - kick
+  - promote
+  - demote
+  - anti link enforcement
+- Pelaksana wajib owner bot atau admin grup untuk:
+  - `.kick`
+  - `.promote`
+  - `.demote`
+  - `.tagall`
+  - `.antilink on/off`
+- Member biasa selalu ditolak.
+
+Hierarki role:
+
+```txt
+Owner Bot
+Admin Grup
+Member
+```
+
+Matrix hak akses kick:
+
+| Pelaksana | Target Member | Target Admin | Target Owner |
+|---|---|---|---|
+| Owner Bot | boleh | boleh | tidak boleh |
+| Admin Grup | boleh | tidak boleh | tidak boleh |
+| Member | tidak boleh | tidak boleh | tidak boleh |
+
+Matrix hak akses promote:
+
+| Pelaksana | Target Member | Target Admin | Target Owner |
+|---|---|---|---|
+| Owner Bot | boleh | sudah admin | tidak perlu |
+| Admin Grup | boleh | sudah admin | tidak boleh |
+| Member | tidak boleh | tidak boleh | tidak boleh |
+
+Matrix hak akses demote:
+
+| Pelaksana | Target Member | Target Admin | Target Owner |
+|---|---|---|---|
+| Owner Bot | target bukan admin | boleh | tidak boleh |
+| Admin Grup | tidak boleh | tidak boleh | tidak boleh |
+| Member | tidak boleh | tidak boleh | tidak boleh |
+
+Flow `.kick @user`:
+
+1. Pastikan command di grup.
+2. Pastikan bot admin grup.
+3. Pastikan pelaksana owner atau admin grup.
+4. Ambil target dari mention.
+5. Tolak jika target kosong.
+6. Tolak jika target owner.
+7. Tolak jika target bot sendiri.
+8. Tolak jika pelaksana menargetkan dirinya sendiri.
+9. Ambil role target dari metadata grup.
+10. Jika pelaksana admin dan target admin, tolak.
+11. Jalankan `groupParticipantsUpdate(groupJid, [targetJid], 'remove')`.
+12. Balas `@user berhasil dikeluarkan dari grup.`
+
+Flow `.promote @user`:
+
+1. Pastikan command di grup.
+2. Pastikan bot admin grup.
+3. Pastikan pelaksana owner atau admin grup.
+4. Ambil target dari mention.
+5. Tolak jika target kosong.
+6. Jika target sudah admin, balas `User tersebut sudah menjadi admin grup.`
+7. Jalankan `groupParticipantsUpdate(groupJid, [targetJid], 'promote')`.
+8. Balas `@user berhasil dijadikan admin grup.`
+
+Flow `.demote @user`:
+
+1. Pastikan command di grup.
+2. Pastikan bot admin grup.
+3. Pastikan pelaksana owner atau admin grup.
+4. Admin grup biasa selalu ditolak untuk demote admin lain.
+5. Ambil target dari mention.
+6. Tolak jika target kosong.
+7. Tolak jika target owner.
+8. Jika target bukan admin, balas `User tersebut bukan admin grup.`
+9. Owner menjalankan `groupParticipantsUpdate(groupJid, [targetJid], 'demote')`.
+10. Balas `@user berhasil diturunkan dari admin grup.`
+
+Flow `.tagall <pesan>`:
+
+1. Pastikan command di grup.
+2. Pastikan pelaksana owner atau admin grup.
+3. Pastikan pesan tidak kosong.
+4. Cek cooldown group.
+5. Ambil metadata grup.
+6. Ambil participant aktif.
+7. Keluarkan JID bot sendiri dari daftar mention.
+8. Batasi maksimal 100 mention.
+9. Kirim pesan:
+
+```txt
+Pengumuman Grup
+
+<pesan>
+
+Dikirim oleh @admin
+```
+
+10. Kirim dengan `mentions` berisi daftar target dan sender.
+11. Simpan cooldown 10 menit.
+
+Flow `.antilink on/off`:
+
+1. Pastikan command di grup.
+2. Pastikan pelaksana owner atau admin grup.
+3. Validasi argumen hanya `on` atau `off`.
+4. Simpan status ke `Group.antiLinkEnabled`.
+5. Jika `on`, balas `Anti link grup WhatsApp berhasil diaktifkan.`
+6. Jika `off`, balas `Anti link grup WhatsApp berhasil dimatikan.`
+
+Flow anti link saat pesan masuk:
+
+1. Hanya diproses untuk pesan grup non-command maupun command.
+2. Pastikan grup approved dan `antiLinkEnabled` true.
+3. Deteksi hanya link undangan grup WhatsApp:
+   - `chat.whatsapp.com/`
+   - `https://chat.whatsapp.com/`
+   - `http://chat.whatsapp.com/`
+   - `www.chat.whatsapp.com/`
+   - opsional channel: `whatsapp.com/channel/`
+4. Abaikan link TikTok, Instagram, YouTube, dan website biasa.
+5. Jika sender owner, abaikan.
+6. Jika sender admin grup, abaikan.
+7. Pastikan bot admin grup.
+8. Hapus pesan pelanggaran.
+9. Kick sender.
+10. Kirim pesan `@user dikeluarkan karena mengirim link grup WhatsApp.`
+
+Strategi hapus pesan dengan Baileys:
+
+- Gunakan `socket.sendMessage(groupJid, { delete: message.key })`.
+- Pastikan `message.key.id`, `message.key.remoteJid`, dan participant tersedia.
+- Log error jika gagal hapus, tetapi jangan membuat bot crash.
+
+Strategi kick/promote/demote dengan Baileys:
+
+- Gunakan `socket.groupParticipantsUpdate(groupJid, [targetJid], action)`.
+- Action:
+  - `remove` untuk kick
+  - `promote` untuk promote
+  - `demote` untuk demote
+- Bot wajib admin grup, jika tidak WhatsApp akan menolak action.
+- Sebelum action, validasi role target dari `socket.groupMetadata(groupJid)`.
+
+Risiko teknis:
+
+- JID target bisa berupa `@lid` atau phone JID, perlu pakai helper number matching seperti `isSameUserJid`.
+- Metadata grup bisa gagal diambil jika koneksi Baileys sedang bermasalah.
+- Bot mungkin admin, tetapi WhatsApp tetap menolak action karena permission atau state grup.
+- Delete message bisa gagal jika key message tidak lengkap.
+- Tagall mention 100 member bisa tetap dianggap ramai, karena itu wajib cooldown.
+- Anti link harus ketat hanya WhatsApp invite, jangan salah tindak link biasa.
+
+Urutan implementasi yang disarankan:
+
+1. Tahap 37 - Schema dan Group Service Anti Link
+2. Tahap 38 - Helper Metadata Role Moderasi
+3. Tahap 39 - Command Kick Promote Demote
+4. Tahap 40 - Command Tagall dengan Cooldown
+5. Tahap 41 - Anti Link Enforcement
+6. Tahap 42 - Menu, Dokumentasi, dan Acceptance Test Moderasi
+
+Acceptance criteria umum:
+
+- `PLAN.md` dibuat sebelum coding moderasi.
+- Owner bisa kick member biasa.
+- Owner bisa kick admin grup.
+- Owner tidak bisa dikick.
+- Owner tidak bisa didemote.
+- Admin bisa kick member biasa.
+- Admin tidak bisa kick admin lain.
+- Admin tidak bisa kick owner.
+- Admin tidak bisa demote admin lain.
+- Member tidak bisa menggunakan command moderasi.
+- Owner dan admin bisa promote member.
+- Owner bisa demote admin.
+- Promote gagal jika target sudah admin.
+- Demote gagal jika target bukan admin.
+- Bot memberi error jika belum menjadi admin.
+- `.tagall <pesan>` hanya bisa digunakan owner/admin.
+- `.tagall` wajib memiliki pesan.
+- `.tagall` memiliki cooldown 10 menit per grup.
+- `.antilink on/off` hanya bisa digunakan owner/admin.
+- Status anti link tersimpan per grup.
+- Jika anti link off, link grup WhatsApp tidak ditindak.
+- Jika anti link on, link `chat.whatsapp.com` dari member biasa langsung dihapus.
+- Jika anti link on, member biasa yang mengirim link `chat.whatsapp.com` langsung dikick.
+- Owner bot tidak terkena anti link.
+- Admin grup tidak terkena anti link.
+- Link TikTok tidak ditindak.
+- Link Instagram tidak ditindak.
+- Link YouTube tidak ditindak.
+- Website biasa tidak ditindak.
+- Menu diperbarui.
+- TypeScript build berhasil.
+- Fitur lama tidak rusak.
+
+Testing checklist:
+
+- `npm run build`
+- `npm run lint`
+- Test manual WhatsApp live untuk `.kick @user`.
+- Test manual WhatsApp live untuk `.promote @user`.
+- Test manual WhatsApp live untuk `.demote @user`.
+- Test manual WhatsApp live untuk `.tagall Pengumuman test`.
+- Test manual cooldown `.tagall`.
+- Test manual `.antilink on`.
+- Kirim link `https://chat.whatsapp.com/...` dari member biasa.
+- Kirim link TikTok, Instagram, YouTube, dan website biasa saat anti link aktif.
+- Test `.antilink off`, lalu kirim link grup WhatsApp dan pastikan tidak ditindak.
+- Cek `pm2 logs kogbot` setelah semua test.
+
+---
+
+## Tahap 37 - Schema dan Group Service Anti Link
+
+Tujuan:
+
+Menambahkan penyimpanan status anti link per grup.
+
+Pekerjaan:
+
+- Tambah `antiLinkEnabled Boolean @default(false)` di model `Group`.
+- Buat migration Prisma.
+- Tambah service:
+  - `setAntiLinkEnabled(groupJid, enabled)`
+  - `isAntiLinkEnabled(groupJid)`
+- Pastikan default off untuk semua grup lama.
+
+Verifikasi:
+
+- Migration berhasil.
+- Group lama tetap valid.
+- Anti link default off.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.
+
+---
+
+## Tahap 38 - Helper Metadata Role Moderasi
+
+Tujuan:
+
+Membuat helper role grup agar command moderasi aman terhadap owner, admin, member, bot sendiri, dan variasi JID.
+
+Pekerjaan:
+
+- Buat helper metadata grup.
+- Deteksi apakah bot admin.
+- Deteksi apakah sender admin.
+- Deteksi apakah target admin.
+- Deteksi target bot sendiri.
+- Deteksi target owner.
+- Gunakan `isOwner`, `isSameUserJid`, dan `getNumberFromJid`.
+
+Verifikasi:
+
+- Helper bisa membaca admin grup.
+- Helper bisa membedakan owner/admin/member.
+- Helper bisa mengenali bot sendiri.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.
+
+---
+
+## Tahap 39 - Command Kick Promote Demote
+
+Tujuan:
+
+Menambahkan command moderasi participant.
+
+Pekerjaan:
+
+- Implementasi `.kick @user`.
+- Implementasi `.promote @user`.
+- Implementasi `.demote @user`.
+- Validasi semua permission sesuai matrix.
+- Gunakan Baileys `groupParticipantsUpdate`.
+- Tambahkan command ke router.
+
+Verifikasi:
+
+- Owner bisa kick member.
+- Owner bisa kick admin.
+- Owner tidak bisa kick dirinya sendiri.
+- Admin bisa kick member.
+- Admin tidak bisa kick admin.
+- Admin tidak bisa kick owner.
+- Member ditolak.
+- Owner/admin bisa promote member.
+- Promote target admin ditolak.
+- Owner bisa demote admin.
+- Admin tidak bisa demote admin.
+- Demote target member ditolak.
+- Bot belum admin memberi pesan error.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.
+
+---
+
+## Tahap 40 - Command Tagall dengan Cooldown
+
+Tujuan:
+
+Menambahkan `.tagall <pesan>` untuk pengumuman admin yang rapi tanpa hidden tag.
+
+Pekerjaan:
+
+- Implementasi service tagall.
+- Cooldown 10 menit per grup di memory.
+- Ambil metadata participant.
+- Mention maksimal 100 member.
+- Jangan mention bot sendiri.
+- Tambah command ke router.
+
+Verifikasi:
+
+- Owner/admin bisa `.tagall`.
+- Member ditolak.
+- Pesan kosong ditolak.
+- Cooldown aktif setelah sukses.
+- Cooldown menampilkan sisa menit.
+- Mentions maksimal 100.
+- Tidak ada hidden tag.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.
+
+---
+
+## Tahap 41 - Anti Link Grup WhatsApp
+
+Tujuan:
+
+Menambahkan anti link khusus undangan grup WhatsApp.
+
+Pekerjaan:
+
+- Implementasi `.antilink on/off`.
+- Simpan status per grup di database.
+- Deteksi link `chat.whatsapp.com`.
+- Opsional deteksi `whatsapp.com/channel`.
+- Jangan tindak TikTok, Instagram, YouTube, dan website biasa.
+- Owner dan admin bebas dari anti link.
+- Member biasa yang melanggar:
+  - pesan dihapus
+  - user dikick
+  - bot mengirim pesan tindakan
+- Hook anti link ke `messageHandler.ts`.
+
+Verifikasi:
+
+- `.antilink on` mengaktifkan status.
+- `.antilink off` mematikan status.
+- Link grup WhatsApp ditindak saat aktif.
+- Link grup WhatsApp tidak ditindak saat off.
+- Owner tidak ditindak.
+- Admin tidak ditindak.
+- Link TikTok tidak ditindak.
+- Link Instagram tidak ditindak.
+- Link YouTube tidak ditindak.
+- Website biasa tidak ditindak.
+- Bot belum admin memberi pesan error.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.
+
+---
+
+## Tahap 42 - Menu, Dokumentasi, dan Acceptance Test Moderasi
+
+Tujuan:
+
+Finalisasi fitur moderasi di menu, README, AGENT, dan checklist test.
+
+Pekerjaan:
+
+- Tambah kategori `MODERASI` di `.menu`.
+- Update `README.md`.
+- Update `AGENT.md`.
+- Tambah daftar manual test WhatsApp live.
+- Jalankan build dan lint.
+
+Verifikasi:
+
+- Menu menampilkan command moderasi.
+- Tidak ada `.warnlist`.
+- Tidak ada `.clearwarn`.
+- Dokumentasi menyebut anti link hanya untuk grup WhatsApp.
+- Dokumentasi melarang hidden tag.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.

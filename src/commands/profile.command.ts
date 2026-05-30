@@ -2,7 +2,7 @@ import { env } from '../config/env.js';
 import { getUserProfile } from '../services/profile.service.js';
 import type { CommandContext } from '../types/command.js';
 import { formatMention } from '../utils/format.js';
-import { getFirstMentionedJid } from '../utils/mentions.js';
+import { resolveFirstMentionedJid } from '../utils/mentions.js';
 import { logger } from '../utils/logger.js';
 
 export async function handleProfileCommand(context: CommandContext): Promise<void> {
@@ -12,7 +12,11 @@ export async function handleProfileCommand(context: CommandContext): Promise<voi
       return;
     }
 
-    const targetJid = getFirstMentionedJid(context.message.message) ?? context.senderJid;
+    const targetJid = await resolveFirstMentionedJid({
+      socket: context.socket,
+      groupJid: context.chatJid,
+      message: context.message.message,
+    }) ?? context.senderJid;
     const profile = await getUserProfile({
       userJid: targetJid,
       groupJid: context.chatJid,

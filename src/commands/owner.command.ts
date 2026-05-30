@@ -7,7 +7,7 @@ import {
   resetDownloadLimit,
 } from '../services/downloadLimit.service.js';
 import { formatMention } from '../utils/format.js';
-import { getFirstMentionedJid } from '../utils/mentions.js';
+import { resolveFirstMentionedJid } from '../utils/mentions.js';
 import { logger } from '../utils/logger.js';
 import {
   handleConfirmResetPointCommand,
@@ -270,7 +270,11 @@ async function getOwnerTargetJid(context: CommandContext): Promise<string | unde
     return undefined;
   }
 
-  const targetJid = getFirstMentionedJid(context.message.message);
+  const targetJid = await resolveFirstMentionedJid({
+    socket: context.socket,
+    groupJid: context.chatJid,
+    message: context.message.message,
+  });
 
   if (!targetJid) {
     await context.reply('Target user wajib di-mention.');

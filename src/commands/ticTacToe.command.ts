@@ -1,5 +1,5 @@
 import { GameType } from '@prisma/client';
-import type { WAMessage, WAMessageContent } from '@whiskeysockets/baileys';
+import type { WAMessage } from '@whiskeysockets/baileys';
 
 import {
   playTicTacToeMove,
@@ -14,6 +14,7 @@ import type { CommandContext } from '../types/command.js';
 import type { TicTacToePayload } from '../types/ticTacToe.js';
 import { formatMention } from '../utils/format.js';
 import { isSameUserJid } from '../utils/jid.js';
+import { resolveFirstMentionedJid } from '../utils/mentions.js';
 import { logger } from '../utils/logger.js';
 import {
   formatTicTacToeQuestion,
@@ -27,7 +28,11 @@ export async function handleTicTacToeCommand(context: CommandContext): Promise<v
       return;
     }
 
-    const opponentJid = getMentionedJids(context.message.message)[0];
+    const opponentJid = await resolveFirstMentionedJid({
+      socket: context.socket,
+      groupJid: context.chatJid,
+      message: context.message.message,
+    });
 
     if (!opponentJid) {
       await context.reply('Gunakan .tictactoe @user untuk mulai duel.');
@@ -195,24 +200,4 @@ async function replyWithMention(
     { text, mentions },
     { quoted: context.message },
   );
-}
-
-function getMentionedJids(message: WAMessageContent | null | undefined): string[] {
-  const content = unwrapMessage(message);
-
-  return (
-    content?.extendedTextMessage?.contextInfo?.mentionedJid ??
-    content?.imageMessage?.contextInfo?.mentionedJid ??
-    content?.videoMessage?.contextInfo?.mentionedJid ??
-    content?.documentMessage?.contextInfo?.mentionedJid ??
-    []
-  );
-}
-
-function unwrapMessage(message: WAMessageContent | null | undefined): WAMessageContent | undefined {
-  if (!message) {
-    return undefined;
-  }
-
-  return message.ephemeralMessage?.message ?? message.viewOnceMessage?.message ?? message.viewOnceMessageV2?.message ?? message;
 }

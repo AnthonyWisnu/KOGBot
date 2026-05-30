@@ -1,7 +1,7 @@
 import { transferDownloadLimit } from '../services/transferLimit.service.js';
 import type { CommandContext } from '../types/command.js';
 import { formatMention } from '../utils/format.js';
-import { getFirstMentionedJid } from '../utils/mentions.js';
+import { resolveFirstMentionedJid } from '../utils/mentions.js';
 import { logger } from '../utils/logger.js';
 
 export async function handleTransferLimitCommand(context: CommandContext): Promise<void> {
@@ -11,7 +11,11 @@ export async function handleTransferLimitCommand(context: CommandContext): Promi
       return;
     }
 
-    const recipientJid = getFirstMentionedJid(context.message.message);
+    const recipientJid = await resolveFirstMentionedJid({
+      socket: context.socket,
+      groupJid: context.chatJid,
+      message: context.message.message,
+    });
 
     if (!recipientJid) {
       await context.reply('Gunakan .transferlimit @user <jumlah>. Contoh: .transferlimit @user 1');
