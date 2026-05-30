@@ -78,12 +78,17 @@ function runYtDlp(params: {
     const args = [
       '--no-playlist',
       '--no-warnings',
+      '--force-ipv4',
       '--max-filesize',
       `${env.MAX_DOWNLOAD_MB}M`,
       '--merge-output-format',
       'mp4',
+      '--recode-video',
+      'mp4',
       '-f',
-      'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best',
+      'bv*+ba/best',
+      '--user-agent',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36',
       '--print',
       'title',
       '-o',
@@ -144,5 +149,7 @@ function createYtDlpExitError(stderr: string, code: number | null): Error {
     return new Error('Video tidak publik');
   }
 
-  return new Error(stderr || `yt-dlp gagal dengan exit code ${code ?? 'unknown'}`);
+  const message = stderr || `yt-dlp gagal dengan exit code ${code ?? 'unknown'}`;
+
+  return new Error(`yt-dlp gagal: ${message.slice(0, 500)}`);
 }

@@ -172,6 +172,8 @@ Daftar command:
 .belilimit <jumlah>
 .tt <link>
 .ig <link>
+.s
+.gambar
 .welcome on
 .welcome off
 .setwelcome <pesan>
@@ -709,6 +711,10 @@ _Contoh: *.nyerah kuis*_
 📥 *DOWNLOADER*
 *.tt <link>* - Download TikTok
 *.ig <link>* - Download Instagram Reels
+
+🖼 *MEDIA*
+*.s* - Reply gambar jadi sticker
+*.gambar* - Reply sticker jadi gambar
 
 👋 *ADMIN*
 *.welcome on/off* - Atur welcome

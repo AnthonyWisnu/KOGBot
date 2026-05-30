@@ -42,6 +42,10 @@ import {
   handleTikTokDownloadCommand,
 } from './downloader.command.js';
 import {
+  handleStickerCommand,
+  handleStickerToImageCommand,
+} from './sticker.command.js';
+import {
   handleBuyLimitCommand,
   handleLimitCommand,
 } from './downloadLimit.command.js';
@@ -66,6 +70,8 @@ const commandHandlers = new Map<string, CommandHandler>([
   ['setwelcome', handleSetWelcomeCommand],
   ['tt', handleTikTokDownloadCommand],
   ['ig', handleInstagramDownloadCommand],
+  ['s', handleStickerCommand],
+  ['gambar', handleStickerToImageCommand],
 ]);
 
 export async function routeCommand(context: CommandContext): Promise<void> {

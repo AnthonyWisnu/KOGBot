@@ -16,6 +16,8 @@ KOGBot adalah project bot WhatsApp berbasis Node.js dan TypeScript untuk grup pr
 - Welcome member baru dan pesan perpisahan member keluar
 - Downloader TikTok publik via `yt-dlp`
 - Downloader Instagram Reels publik via `yt-dlp`
+- Gambar jadi sticker dengan reply `.s`
+- Sticker jadi gambar dengan reply `.gambar`
 - Limit downloader per user per grup
 - Reset poin manual oleh owner dengan konfirmasi
 
@@ -174,6 +176,7 @@ Jalankan setelah bot berhasil login dan masuk ke grup uji:
 5. Reply pesan game aktif dengan teks persis `nyerah`. Pastikan teks seperti `aku nyerah` diabaikan.
 6. Cek `.limit`, lalu `.belilimit <jumlah>` dengan poin cukup dan tidak cukup.
 7. Test `.tt <link>` dan `.ig <link>` publik. Pastikan limit hanya berkurang setelah video berhasil dikirim.
-8. Aktifkan `.welcome on`, lalu test member masuk dan keluar.
-9. Owner menjalankan `.resetpoin`, lalu `.confirmresetpoin` dalam 30 detik.
-10. Cek `pm2 logs kogbot` dan pastikan tidak ada crash.
+8. Reply gambar dengan `.s`, lalu reply sticker dengan `.gambar`.
+9. Aktifkan `.welcome on`, lalu test member masuk dan keluar.
+10. Owner menjalankan `.resetpoin`, lalu `.confirmresetpoin` dalam 30 detik.
+11. Cek `pm2 logs kogbot` dan pastikan tidak ada crash.

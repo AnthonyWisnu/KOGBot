@@ -58,7 +58,11 @@ export async function handleTikTokDownloadCommand(context: CommandContext): Prom
       { quoted: context.message },
     );
   } catch (error) {
-    logger.error({ error, chatJid: context.chatJid }, 'Gagal menjalankan command TikTok downloader');
+    logger.error({
+      error,
+      errorMessage: getErrorMessage(error),
+      chatJid: context.chatJid,
+    }, 'Gagal menjalankan command TikTok downloader');
 
     await refundReservedDownloadLimit({
       userJid: context.senderJid,
@@ -73,6 +77,11 @@ export async function handleTikTokDownloadCommand(context: CommandContext): Prom
 
     if (isYtDlpMissingError(error)) {
       await context.reply('Downloader belum siap. yt-dlp belum terinstall di server.');
+      return;
+    }
+
+    if (isNotPublicVideoError(error)) {
+      await context.reply('Gagal download. Video tidak publik atau butuh login.');
       return;
     }
 
@@ -127,7 +136,11 @@ export async function handleInstagramDownloadCommand(context: CommandContext): P
       { quoted: context.message },
     );
   } catch (error) {
-    logger.error({ error, chatJid: context.chatJid }, 'Gagal menjalankan command Instagram downloader');
+    logger.error({
+      error,
+      errorMessage: getErrorMessage(error),
+      chatJid: context.chatJid,
+    }, 'Gagal menjalankan command Instagram downloader');
 
     await refundReservedDownloadLimit({
       userJid: context.senderJid,
@@ -145,6 +158,11 @@ export async function handleInstagramDownloadCommand(context: CommandContext): P
       return;
     }
 
+    if (isNotPublicVideoError(error)) {
+      await context.reply('Gagal download. Video tidak publik atau butuh login.');
+      return;
+    }
+
     await context.reply('Gagal download. Pastikan link publik dan coba lagi.');
   } finally {
     if (filePath) {
@@ -159,4 +177,12 @@ function isFileTooLargeError(error: unknown): boolean {
 
 function isYtDlpMissingError(error: unknown): boolean {
   return error instanceof Error && error.message === 'yt-dlp belum terinstall';
+}
+
+function isNotPublicVideoError(error: unknown): boolean {
+  return error instanceof Error && error.message === 'Video tidak publik';
+}
+
+function getErrorMessage(error: unknown): string | undefined {
+  return error instanceof Error ? error.message : undefined;
 }
