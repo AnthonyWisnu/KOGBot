@@ -39,7 +39,7 @@ export async function handleProfileCommand(context: CommandContext): Promise<voi
         text: [
           '*Profile MinjiBot*',
           '',
-          `User: ${profile.displayName}`,
+          `User: ${targetDisplay.label}`,
           `Poin: ${profile.points}`,
           `Limit: ${profile.limit}`,
           `Rank: ${rankText}`,
