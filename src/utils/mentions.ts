@@ -3,7 +3,9 @@ import type {
   WASocket,
 } from '@whiskeysockets/baileys';
 
-import { getNumberFromJid } from './jid.js';
+import { resolveGroupUserJid } from '../services/userIdentity.service.js';
+import { findGroupParticipant } from './groupMetadata.js';
+import { normalizeJid } from './jid.js';
 
 export function getFirstMentionedJid(
   message: WAMessageContent | null | undefined,
@@ -58,20 +60,18 @@ export async function resolveGroupParticipantJid(params: {
   groupJid: string;
   participantJid: string;
 }): Promise<string> {
-  const metadata = await params.socket.groupMetadata(params.groupJid);
-  const participantNumber = getNumberFromJid(params.participantJid);
-  const participant = metadata.participants.find((item) => {
-    return (
-      item.id === params.participantJid ||
-      item.jid === params.participantJid ||
-      item.lid === params.participantJid ||
-      getNumberFromJid(item.id) === participantNumber ||
-      (item.jid ? getNumberFromJid(item.jid) === participantNumber : false) ||
-      (item.lid ? getNumberFromJid(item.lid) === participantNumber : false)
-    );
-  });
+  if (!params.participantJid.endsWith('@lid')) {
+    return normalizeJid(params.participantJid);
+  }
 
-  return participant?.jid ?? participant?.id ?? params.participantJid;
+  const metadata = await params.socket.groupMetadata(params.groupJid);
+  const participant = findGroupParticipant(metadata, params.participantJid);
+
+  return await resolveGroupUserJid({
+    socket: params.socket,
+    groupJid: params.groupJid,
+    userJid: participant?.jid ?? participant?.id ?? params.participantJid,
+  });
 }
 
 function unwrapMessage(

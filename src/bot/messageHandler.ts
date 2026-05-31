@@ -22,7 +22,9 @@ import {
   isGroupApproved,
 } from '../services/group.service.js';
 import { enforceAntiLink } from '../services/antiLink.service.js';
+import { resolveGroupUserJid } from '../services/userIdentity.service.js';
 import type { CommandContext, ParsedCommand } from '../types/command.js';
+import { normalizeJid } from '../utils/jid.js';
 import { logger } from '../utils/logger.js';
 
 const groupNotApprovedMessage =
@@ -62,15 +64,22 @@ async function handleIncomingMessage(
       return;
     }
 
-    const senderJid = getSenderJid(message);
+    const rawSenderJid = getSenderJid(message);
 
-    if (!senderJid) {
+    if (!rawSenderJid) {
       logger.warn({ chatJid }, 'Pesan masuk tidak memiliki sender JID');
       return;
     }
 
     const command = parseCommand(text, env.BOT_PREFIX);
     const isGroup = isGroupJid(chatJid);
+    const senderJid = isGroup
+      ? await resolveGroupUserJid({
+          socket,
+          groupJid: chatJid,
+          userJid: rawSenderJid,
+        })
+      : normalizeJid(rawSenderJid);
     const groupName = isGroup ? await getGroupName(socket, chatJid) : undefined;
 
     const context = createCommandContext({

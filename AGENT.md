@@ -1266,6 +1266,7 @@ Scripts di `package.json`:
     "build": "tsc",
     "start": "node dist/index.js",
     "seed": "tsx prisma/seed.ts",
+    "jid:merge": "tsx prisma/mergeLidUsers.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   }

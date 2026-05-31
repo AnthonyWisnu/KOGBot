@@ -1,11 +1,12 @@
 import { env } from '../config/env.js';
 import { getUserProfile } from '../services/profile.service.js';
 import type { CommandContext } from '../types/command.js';
-import { formatMention } from '../utils/format.js';
+import { resolveFirstMentionedJid } from '../utils/mentions.js';
 import {
-  getMentionLabelFromText,
-  resolveFirstMentionedJid,
-} from '../utils/mentions.js';
+  findGroupParticipant,
+  getParticipantDisplayName,
+} from '../utils/groupMetadata.js';
+import { isSameUserJid } from '../utils/jid.js';
 import { logger } from '../utils/logger.js';
 
 export async function handleProfileCommand(context: CommandContext): Promise<void> {
@@ -20,10 +21,14 @@ export async function handleProfileCommand(context: CommandContext): Promise<voi
       groupJid: context.chatJid,
       message: context.message.message,
     }) ?? context.senderJid;
-    const targetLabel = getMentionLabelFromText(context.command.rawArgs) ?? formatMention(targetJid);
+    const participantName = await getProfileParticipantName(context, targetJid);
     const profile = await getUserProfile({
       userJid: targetJid,
       groupJid: context.chatJid,
+      pushName: isSameUserJid(targetJid, context.senderJid)
+        ? context.message.pushName ?? undefined
+        : undefined,
+      participantName,
     });
     const rankText = profile.rank ?? '-';
 
@@ -33,7 +38,7 @@ export async function handleProfileCommand(context: CommandContext): Promise<voi
         text: [
           '*Profile MinjiBot*',
           '',
-          `User: ${targetLabel}`,
+          `User: ${profile.displayName}`,
           `Poin: ${profile.points}`,
           `Limit: ${profile.limit}`,
           `Rank: ${rankText}`,
@@ -55,5 +60,26 @@ export async function handleProfileCommand(context: CommandContext): Promise<voi
       'Gagal menjalankan command profile',
     );
     throw error;
+  }
+}
+
+async function getProfileParticipantName(
+  context: CommandContext,
+  targetJid: string,
+): Promise<string | undefined> {
+  try {
+    const metadata = await context.socket.groupMetadata(context.chatJid);
+
+    return getParticipantDisplayName(findGroupParticipant(metadata, targetJid));
+  } catch (error) {
+    logger.warn(
+      {
+        error,
+        chatJid: context.chatJid,
+        targetJid,
+      },
+      'Gagal mengambil nama participant untuk profile',
+    );
+    return undefined;
   }
 }

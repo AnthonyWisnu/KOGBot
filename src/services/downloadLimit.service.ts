@@ -2,6 +2,7 @@ import type { UserDownloadLimit } from '@prisma/client';
 
 import { prisma } from '../database/prisma.js';
 import { isOwner } from '../bot/permissions.js';
+import { normalizeJid } from '../utils/jid.js';
 import { logger } from '../utils/logger.js';
 import {
   getDisplayWeeklyScore,
@@ -40,16 +41,19 @@ export async function getDownloadLimitStatus(params: {
   groupJid: string;
 }): Promise<DownloadLimitStatus> {
   try {
-    if (isOwner(params.userJid)) {
+    const userJid = normalizeJid(params.userJid);
+    const normalizedParams = { ...params, userJid };
+
+    if (isOwner(userJid)) {
       return {
         limit: ownerDisplayLimit,
-        points: await getDisplayWeeklyScore(params),
+        points: await getDisplayWeeklyScore(normalizedParams),
       };
     }
 
     const [limit, points] = await Promise.all([
-      getOrCreateDownloadLimit(params),
-      getWeeklyScore(params),
+      getOrCreateDownloadLimit(normalizedParams),
+      getWeeklyScore(normalizedParams),
     ]);
 
     return {
@@ -68,14 +72,17 @@ export async function buyDownloadLimit(params: {
   amount: number;
 }): Promise<BuyDownloadLimitResult> {
   try {
-    if (isOwner(params.userJid)) {
+    const userJid = normalizeJid(params.userJid);
+    const normalizedParams = { ...params, userJid };
+
+    if (isOwner(userJid)) {
       return {
         status: 'owner_unlimited',
       };
     }
 
     const requiredPoints = params.amount * pointsPerDownloadLimit;
-    const currentPoints = await getWeeklyScore(params);
+    const currentPoints = await getWeeklyScore(normalizedParams);
 
     if (currentPoints < requiredPoints) {
       return {
@@ -89,7 +96,7 @@ export async function buyDownloadLimit(params: {
     const currentLimit = await prisma.$transaction(async (transaction) => {
       const spent = await transaction.weeklyScore.updateMany({
         where: {
-          userJid: params.userJid,
+          userJid,
           groupJid: params.groupJid,
           weekStart,
           score: {
@@ -110,12 +117,12 @@ export async function buyDownloadLimit(params: {
       const limit = await transaction.userDownloadLimit.upsert({
         where: {
           userJid_groupJid: {
-            userJid: params.userJid,
+            userJid,
             groupJid: params.groupJid,
           },
         },
         create: {
-          userJid: params.userJid,
+          userJid,
           groupJid: params.groupJid,
           limit: defaultDownloadLimit + params.amount,
         },
@@ -133,11 +140,11 @@ export async function buyDownloadLimit(params: {
       return {
         status: 'insufficient_points',
         requiredPoints,
-        currentPoints: await getWeeklyScore(params),
+        currentPoints: await getWeeklyScore(normalizedParams),
       };
     }
 
-    const remainingPoints = await getWeeklyScore(params);
+    const remainingPoints = await getWeeklyScore(normalizedParams);
 
     return {
       status: 'success',
@@ -157,14 +164,17 @@ export async function reserveDownloadLimit(params: {
   groupJid: string;
 }): Promise<boolean> {
   try {
-    if (isOwner(params.userJid)) {
+    const userJid = normalizeJid(params.userJid);
+    const normalizedParams = { ...params, userJid };
+
+    if (isOwner(userJid)) {
       return true;
     }
 
-    await getOrCreateDownloadLimit(params);
+    await getOrCreateDownloadLimit(normalizedParams);
     const result = await prisma.userDownloadLimit.updateMany({
       where: {
-        userJid: params.userJid,
+        userJid,
         groupJid: params.groupJid,
         limit: {
           gt: 0,
@@ -189,12 +199,14 @@ export async function refundDownloadLimit(params: {
   groupJid: string;
 }): Promise<void> {
   try {
-    if (isOwner(params.userJid)) {
+    const userJid = normalizeJid(params.userJid);
+
+    if (isOwner(userJid)) {
       return;
     }
 
     await addDownloadLimit({
-      userJid: params.userJid,
+      userJid,
       groupJid: params.groupJid,
       amount: 1,
     });
@@ -224,15 +236,17 @@ async function getOrCreateDownloadLimit(params: {
   userJid: string;
   groupJid: string;
 }): Promise<UserDownloadLimit> {
+  const userJid = normalizeJid(params.userJid);
+
   return await prisma.userDownloadLimit.upsert({
     where: {
       userJid_groupJid: {
-        userJid: params.userJid,
+        userJid,
         groupJid: params.groupJid,
       },
     },
     create: {
-      userJid: params.userJid,
+      userJid,
       groupJid: params.groupJid,
       limit: defaultDownloadLimit,
     },
@@ -245,19 +259,21 @@ export async function addDownloadLimit(params: {
   groupJid: string;
   amount: number;
 }): Promise<number> {
-  if (isOwner(params.userJid)) {
+  const userJid = normalizeJid(params.userJid);
+
+  if (isOwner(userJid)) {
     return ownerDisplayLimit;
   }
 
   const limit = await prisma.userDownloadLimit.upsert({
     where: {
       userJid_groupJid: {
-        userJid: params.userJid,
+        userJid,
         groupJid: params.groupJid,
       },
     },
     create: {
-      userJid: params.userJid,
+      userJid,
       groupJid: params.groupJid,
       limit: defaultDownloadLimit + params.amount,
     },
@@ -275,19 +291,21 @@ export async function resetDownloadLimit(params: {
   userJid: string;
   groupJid: string;
 }): Promise<number> {
-  if (isOwner(params.userJid)) {
+  const userJid = normalizeJid(params.userJid);
+
+  if (isOwner(userJid)) {
     return ownerDisplayLimit;
   }
 
   const limit = await prisma.userDownloadLimit.upsert({
     where: {
       userJid_groupJid: {
-        userJid: params.userJid,
+        userJid,
         groupJid: params.groupJid,
       },
     },
     create: {
-      userJid: params.userJid,
+      userJid,
       groupJid: params.groupJid,
       limit: defaultDownloadLimit,
     },

@@ -48,6 +48,22 @@ export function getParticipantIdentityJid(participant: GroupParticipant): string
   return participant.jid ?? participant.id;
 }
 
+export function getParticipantDisplayName(
+  participant: GroupParticipant | undefined,
+): string | undefined {
+  if (!participant) {
+    return undefined;
+  }
+
+  const record = participant as unknown as Record<string, unknown>;
+
+  return [
+    record.notify,
+    record.name,
+    record.verifiedName,
+  ].find((name): name is string => typeof name === 'string' && name.trim().length > 0);
+}
+
 export function isSameGroupParticipant(
   first: GroupParticipant | undefined,
   second: GroupParticipant | undefined,

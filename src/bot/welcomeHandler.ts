@@ -1,6 +1,7 @@
 import type { BaileysEventMap, WASocket } from '@whiskeysockets/baileys';
 
 import { ensureGroup } from '../services/group.service.js';
+import { reconcileGroupUserIdentities } from '../services/userIdentity.service.js';
 import {
   buildGoodbyeMessages,
   buildWelcomeMessages,
@@ -17,6 +18,7 @@ export async function handleGroupParticipantsUpdate(
     }
 
     const metadata = await socket.groupMetadata(event.id);
+    await reconcileGroupUserIdentities(metadata);
     await ensureGroup(event.id, metadata.subject);
 
     const messages = event.action === 'add'

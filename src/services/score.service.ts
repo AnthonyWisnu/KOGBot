@@ -3,6 +3,7 @@ import type { WeeklyScore } from '@prisma/client';
 import { prisma } from '../database/prisma.js';
 import { env } from '../config/env.js';
 import { isOwner } from '../bot/permissions.js';
+import { normalizeJid } from '../utils/jid.js';
 import { logger } from '../utils/logger.js';
 
 const jakartaOffsetMs = 7 * 60 * 60 * 1000;
@@ -20,18 +21,19 @@ export async function addWeeklyScore(params: {
   now?: Date;
 }): Promise<WeeklyScore> {
   try {
+    const userJid = normalizeJid(params.userJid);
     const weekStart = getWeekStartJakarta(params.now ?? new Date());
 
     return await prisma.weeklyScore.upsert({
       where: {
         userJid_groupJid_weekStart: {
-          userJid: params.userJid,
+          userJid,
           groupJid: params.groupJid,
           weekStart,
         },
       },
       create: {
-        userJid: params.userJid,
+        userJid,
         groupJid: params.groupJid,
         score: params.points,
         weekStart,
@@ -54,11 +56,12 @@ export async function getWeeklyScore(params: {
   now?: Date;
 }): Promise<number> {
   try {
+    const userJid = normalizeJid(params.userJid);
     const weekStart = getWeekStartJakarta(params.now ?? new Date());
     const score = await prisma.weeklyScore.findUnique({
       where: {
         userJid_groupJid_weekStart: {
-          userJid: params.userJid,
+          userJid,
           groupJid: params.groupJid,
           weekStart,
         },
@@ -80,11 +83,13 @@ export async function getDisplayWeeklyScore(params: {
   groupJid: string;
   now?: Date;
 }): Promise<number> {
-  if (isOwner(params.userJid)) {
+  const userJid = normalizeJid(params.userJid);
+
+  if (isOwner(userJid)) {
     return ownerDisplayScore;
   }
 
-  return await getWeeklyScore(params);
+  return await getWeeklyScore({ ...params, userJid });
 }
 
 export async function spendWeeklyScore(params: {
@@ -94,10 +99,11 @@ export async function spendWeeklyScore(params: {
   now?: Date;
 }): Promise<boolean> {
   try {
+    const userJid = normalizeJid(params.userJid);
     const weekStart = getWeekStartJakarta(params.now ?? new Date());
     const result = await prisma.weeklyScore.updateMany({
       where: {
-        userJid: params.userJid,
+        userJid,
         groupJid: params.groupJid,
         weekStart,
         score: {

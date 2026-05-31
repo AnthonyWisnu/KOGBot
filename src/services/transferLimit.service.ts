@@ -1,6 +1,6 @@
 import { prisma } from '../database/prisma.js';
 import { isOwner } from '../bot/permissions.js';
-import { isSameUserJid } from '../utils/jid.js';
+import { normalizeJid } from '../utils/jid.js';
 import { logger } from '../utils/logger.js';
 import { addDownloadLimit } from './downloadLimit.service.js';
 
@@ -28,15 +28,18 @@ export async function transferDownloadLimit(params: {
   amount: number;
 }): Promise<TransferLimitResult> {
   try {
-    if (isSameUserJid(params.senderJid, params.recipientJid)) {
+    const senderJid = normalizeJid(params.senderJid);
+    const recipientJid = normalizeJid(params.recipientJid);
+
+    if (senderJid === recipientJid) {
       return {
         status: 'same_user',
       };
     }
 
-    if (isOwner(params.senderJid)) {
+    if (isOwner(senderJid)) {
       const recipientLimit = await addDownloadLimit({
-        userJid: params.recipientJid,
+        userJid: recipientJid,
         groupJid: params.groupJid,
         amount: params.amount,
       });
@@ -53,12 +56,12 @@ export async function transferDownloadLimit(params: {
       await transaction.userDownloadLimit.upsert({
         where: {
           userJid_groupJid: {
-            userJid: params.senderJid,
+            userJid: senderJid,
             groupJid: params.groupJid,
           },
         },
         create: {
-          userJid: params.senderJid,
+          userJid: senderJid,
           groupJid: params.groupJid,
           limit: defaultDownloadLimit,
         },
@@ -67,7 +70,7 @@ export async function transferDownloadLimit(params: {
 
       const debited = await transaction.userDownloadLimit.updateMany({
         where: {
-          userJid: params.senderJid,
+          userJid: senderJid,
           groupJid: params.groupJid,
           limit: {
             gte: params.amount,
@@ -84,7 +87,7 @@ export async function transferDownloadLimit(params: {
         const senderLimit = await transaction.userDownloadLimit.findUnique({
           where: {
             userJid_groupJid: {
-              userJid: params.senderJid,
+              userJid: senderJid,
               groupJid: params.groupJid,
             },
           },
@@ -103,7 +106,7 @@ export async function transferDownloadLimit(params: {
         transaction.userDownloadLimit.findUniqueOrThrow({
           where: {
             userJid_groupJid: {
-              userJid: params.senderJid,
+              userJid: senderJid,
               groupJid: params.groupJid,
             },
           },
@@ -114,12 +117,12 @@ export async function transferDownloadLimit(params: {
         transaction.userDownloadLimit.upsert({
           where: {
             userJid_groupJid: {
-              userJid: params.recipientJid,
+              userJid: recipientJid,
               groupJid: params.groupJid,
             },
           },
           create: {
-            userJid: params.recipientJid,
+            userJid: recipientJid,
             groupJid: params.groupJid,
             limit: defaultDownloadLimit + params.amount,
           },

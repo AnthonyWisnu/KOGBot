@@ -179,11 +179,21 @@ pm2 restart kogbot
 - Konten private yang tidak dapat diakses akun cookie tidak didukung.
 - Setiap download sukses memakai 1 limit. Download gagal tidak mengurangi limit.
 - Owner selalu tampil memiliki 999 poin dan 999 limit tanpa menyimpan nilai 999 permanen di database.
+- Identitas user disimpan sebagai `[nomor]@s.whatsapp.net`. Record lama berformat `@lid` digabungkan otomatis saat metadata grup tersedia.
 - Poin tidak direset otomatis. Reset poin hanya manual oleh owner dengan `.resetpoin` lalu `.confirmresetpoin`.
 - `.tagall` hanya mengirim pengumuman yang terlihat, bukan hidden tag. Mention dibatasi maksimal 100 participant dan bot tidak ikut dimention.
 - Anti link hanya mendeteksi undangan grup `chat.whatsapp.com`. Link TikTok, Instagram, YouTube, dan website biasa tidak ditindak.
 - Bot wajib menjadi admin grup untuk menjalankan kick, promote, demote, hapus pesan, dan enforcement anti link.
 - Moderasi tidak memakai sistem warning, `.warnlist`, atau `.clearwarn`.
+
+Memeriksa atau menggabungkan sisa data `@lid` secara manual:
+
+```bash
+npm run jid:merge
+npm run jid:merge -- "123456@lid=628123456789@s.whatsapp.net"
+```
+
+Gunakan argumen mapping hanya jika record `@lid` masih tersisa setelah bot terkoneksi. Nilai limit duplikat memakai nilai terbesar, sedangkan poin dan jumlah kemenangan dijumlahkan.
 
 ## Moderasi Grup
 

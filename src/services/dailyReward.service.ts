@@ -1,4 +1,5 @@
 import { prisma } from '../database/prisma.js';
+import { normalizeJid } from '../utils/jid.js';
 import { logger } from '../utils/logger.js';
 import { addDownloadLimit } from './downloadLimit.service.js';
 import { addWeeklyScore } from './score.service.js';
@@ -39,16 +40,17 @@ export async function claimDailyReward(params: {
   now?: Date;
 }): Promise<DailyRewardResult> {
   try {
+    const userJid = normalizeJid(params.userJid);
     const now = params.now ?? new Date();
     const stats = await prisma.userStats.upsert({
       where: {
         userJid_groupJid: {
-          userJid: params.userJid,
+          userJid,
           groupJid: params.groupJid,
         },
       },
       create: {
-        userJid: params.userJid,
+        userJid,
         groupJid: params.groupJid,
       },
       update: {},
@@ -70,7 +72,7 @@ export async function claimDailyReward(params: {
     await prisma.userStats.update({
       where: {
         userJid_groupJid: {
-          userJid: params.userJid,
+          userJid,
           groupJid: params.groupJid,
         },
       },
@@ -81,14 +83,14 @@ export async function claimDailyReward(params: {
 
     if (reward.type === 'points') {
       await addWeeklyScore({
-        userJid: params.userJid,
+        userJid,
         groupJid: params.groupJid,
         points: reward.amount,
         now,
       });
     } else {
       await addDownloadLimit({
-        userJid: params.userJid,
+        userJid,
         groupJid: params.groupJid,
         amount: reward.amount,
       });

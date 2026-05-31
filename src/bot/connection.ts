@@ -12,6 +12,7 @@ import { mkdir } from 'node:fs/promises';
 import qrcodeTerminal from 'qrcode-terminal';
 
 import { env } from '../config/env.js';
+import { reconcileAllGroupUserIdentities } from '../services/userIdentity.service.js';
 import { logger } from '../utils/logger.js';
 import { handleMessagesUpsert } from './messageHandler.js';
 import { handleGroupParticipantsUpdate } from './welcomeHandler.js';
@@ -56,7 +57,7 @@ function bindConnectionEvents(socket: WASocket, saveCreds: SaveCredentials): voi
   });
 
   socket.ev.on('connection.update', (update) => {
-    handleConnectionUpdate(update);
+    handleConnectionUpdate(socket, update);
   });
 
   socket.ev.on('messages.upsert', (event) => {
@@ -77,6 +78,7 @@ async function persistCredentials(saveCreds: SaveCredentials): Promise<void> {
 }
 
 function handleConnectionUpdate(
+  socket: WASocket,
   update: BaileysEventMap['connection.update'],
 ): void {
   try {
@@ -87,6 +89,7 @@ function handleConnectionUpdate(
 
     if (update.connection === 'open') {
       logger.info('Koneksi WhatsApp berhasil dibuka');
+      void reconcileAllGroupUserIdentities(socket);
       return;
     }
 

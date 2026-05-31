@@ -1,6 +1,7 @@
 import type { UserStats } from '@prisma/client';
 
 import { prisma } from '../database/prisma.js';
+import { normalizeJid } from '../utils/jid.js';
 import { logger } from '../utils/logger.js';
 
 export async function getOrCreateUserStats(params: {
@@ -8,15 +9,17 @@ export async function getOrCreateUserStats(params: {
   groupJid: string;
 }): Promise<UserStats> {
   try {
+    const userJid = normalizeJid(params.userJid);
+
     return await prisma.userStats.upsert({
       where: {
         userJid_groupJid: {
-          userJid: params.userJid,
+          userJid,
           groupJid: params.groupJid,
         },
       },
       create: {
-        userJid: params.userJid,
+        userJid,
         groupJid: params.groupJid,
       },
       update: {},
@@ -33,15 +36,17 @@ export async function incrementGamesWon(params: {
   amount?: number;
 }): Promise<UserStats> {
   try {
+    const userJid = normalizeJid(params.userJid);
+
     return await prisma.userStats.upsert({
       where: {
         userJid_groupJid: {
-          userJid: params.userJid,
+          userJid,
           groupJid: params.groupJid,
         },
       },
       create: {
-        userJid: params.userJid,
+        userJid,
         groupJid: params.groupJid,
         gamesWon: params.amount ?? 1,
       },
