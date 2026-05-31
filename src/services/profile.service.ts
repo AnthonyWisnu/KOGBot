@@ -47,14 +47,15 @@ export async function getUserProfile(params: {
       getDownloadLimitStatus(normalizedParams),
       getOrCreateUserStats(normalizedParams),
     ]);
+    const owner = isOwner(userJid);
 
     return {
       userJid,
       displayName: preferredName ?? user.name ?? getUserNumberLabel(userJid),
       points,
       limit: limitStatus.limit,
-      rank: isOwner(userJid) ? 'Owner' : await getUserRank(normalizedParams, points),
-      gamesWon: stats.gamesWon,
+      rank: owner ? 'Owner' : await getUserRank(normalizedParams, points),
+      gamesWon: owner ? 999 : stats.gamesWon,
     };
   } catch (error) {
     logger.error({ error, params }, 'Gagal mengambil profil user');
