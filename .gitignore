@@ -2,6 +2,9 @@ node_modules/
 dist/
 .env
 *.log
+cookies.txt
+*_cookies.txt
+*.cookies.txt
 dev.db
 dev.db-journal
 prisma/dev.db

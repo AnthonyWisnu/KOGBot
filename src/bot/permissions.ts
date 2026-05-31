@@ -3,6 +3,10 @@ import type { WASocket } from '@whiskeysockets/baileys';
 
 import { logger } from '../utils/logger.js';
 import { getNumberFromJid } from '../utils/jid.js';
+import {
+  findGroupParticipant,
+  isGroupParticipantAdmin,
+} from '../utils/groupMetadata.js';
 
 export function isOwner(senderJid: string): boolean {
   const senderNumber = getNumberFromJid(senderJid);
@@ -25,14 +29,9 @@ export async function isGroupAdmin(params: {
     }
 
     const metadata = await params.socket.groupMetadata(params.groupJid);
-    const senderNumber = getNumberFromJid(params.senderJid);
-    const participant = metadata.participants.find((item) => {
-      const itemJid = item.id;
+    const participant = findGroupParticipant(metadata, params.senderJid);
 
-      return itemJid === params.senderJid || getNumberFromJid(itemJid) === senderNumber;
-    });
-
-    return participant?.admin === 'admin' || participant?.admin === 'superadmin';
+    return isGroupParticipantAdmin(participant);
   } catch (error) {
     logger.error(
       {

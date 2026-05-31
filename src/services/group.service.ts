@@ -100,3 +100,47 @@ export async function listApprovedGroups(): Promise<Group[]> {
     throw error;
   }
 }
+
+export async function setAntiLinkEnabled(
+  groupJid: string,
+  enabled: boolean,
+  name?: string,
+): Promise<Group> {
+  try {
+    return await prisma.group.upsert({
+      where: {
+        jid: groupJid,
+      },
+      create: {
+        jid: groupJid,
+        name,
+        antiLinkEnabled: enabled,
+      },
+      update: {
+        ...(name ? { name } : {}),
+        antiLinkEnabled: enabled,
+      },
+    });
+  } catch (error) {
+    logger.error({ error, groupJid, enabled }, 'Gagal mengubah status anti link grup');
+    throw error;
+  }
+}
+
+export async function isAntiLinkEnabled(groupJid: string): Promise<boolean> {
+  try {
+    const group = await prisma.group.findUnique({
+      where: {
+        jid: groupJid,
+      },
+      select: {
+        antiLinkEnabled: true,
+      },
+    });
+
+    return group?.antiLinkEnabled ?? false;
+  } catch (error) {
+    logger.error({ error, groupJid }, 'Gagal memeriksa status anti link grup');
+    throw error;
+  }
+}

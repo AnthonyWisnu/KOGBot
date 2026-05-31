@@ -27,6 +27,7 @@ Bangun WhatsApp bot yang stabil, modular, dan mudah dikembangkan dengan fitur ut
 - Transfer limit antar user
 - Download TikTok publik tanpa watermark
 - Download Instagram Reels publik
+- Download satu Instagram Story berdasarkan URL spesifik
 - Welcome member baru
 - Pesan perpisahan member keluar
 - Whitelist grup
@@ -34,14 +35,12 @@ Bangun WhatsApp bot yang stabil, modular, dan mudah dikembangkan dengan fitur ut
 - Reply-based surrender untuk game aktif
 - Reset poin manual owner dengan konfirmasi
 - Owner tools untuk memberi poin, memberi limit, dan reset limit user
+- Moderasi grup: kick, promote, demote, delete message, tagall, dan anti link grup WhatsApp
 
 Fitur yang tidak dibuat di versi awal:
 
-- Instagram Story downloader
-- Tag all
 - Hidden tag all
 - AI chat
-- Anti link
 - Tebak gambar
 - Tebak lagu
 - Dashboard web
@@ -116,7 +115,7 @@ File berikut dikecualikan dari batas baris:
 - `prisma/seed.ts` (data seed banyak)
 - File generated Prisma
 - `package-lock.json` / `yarn.lock`
-- File dokumentasi dan konfigurasi yang wajar panjang (`AGENT.md`, `ecosystem.config.js`, `.env.example`)
+- File dokumentasi dan konfigurasi yang wajar panjang (`AGENT.md`, `ecosystem.config.cjs`, `.env.example`)
 
 ---
 
@@ -131,7 +130,7 @@ File berikut dikecualikan dari batas baris:
 7. Jangan membuat fitur hidden tag all.
 8. Jangan membuat downloader untuk private content.
 9. Jangan membuat bypass login Instagram.
-10. Bot hanya memproses TikTok dan Instagram Reels publik.
+10. Bot memproses TikTok publik, Instagram Reels, dan satu Instagram Story berdasarkan URL spesifik yang dapat diakses akun cookie secara sah.
 11. Bot harus punya whitelist grup.
 12. Bot harus tetap aman jika dimasukkan ke grup yang belum disetujui.
 13. Bot harus menyimpan poin per grup.
@@ -142,6 +141,10 @@ File berikut dikecualikan dari batas baris:
 18. Owner selalu tampil 999 poin dan 999 limit tanpa menyimpan angka 999 permanen di database.
 19. Bot harus punya profile user, daily reward, dan transfer limit.
 20. Bot harus bisa dijalankan di VPS Ubuntu menggunakan PM2.
+21. Jangan membuat hidden tag.
+22. Anti link hanya mendeteksi link undangan grup WhatsApp, bukan semua domain.
+23. Jangan membuat sistem warning, `.warnlist`, atau `.clearwarn`.
+24. Cookie Instagram tidak boleh disimpan di git atau ditulis ke log.
 
 ---
 
@@ -183,6 +186,7 @@ Daftar command:
 .daily
 .tt <link>
 .ig <link>
+.igstory <link>
 .s
 .gambar
 .welcome on
@@ -196,6 +200,13 @@ Daftar command:
 .givepoin @user <jumlah>
 .givelimit @user <jumlah>
 .resetlimit @user
+.kick @user
+.promote @user
+.demote @user
+.del
+.tagall <pesan>
+.antilink on
+.antilink off
 .ownermenu
 ```
 
@@ -228,6 +239,11 @@ Admin grup dapat:
 
 - Menyalakan atau mematikan welcome
 - Mengubah pesan welcome
+- Kick member biasa
+- Promote member biasa menjadi admin
+- Menghapus pesan member atau admin lain dengan reply `.del`
+- Mengirim pengumuman grup dengan `.tagall <pesan>`
+- Menyalakan atau mematikan anti link undangan grup WhatsApp
 - Memulai dan menghentikan game
 - Menggunakan downloader
 - Melihat rank dan poin
@@ -614,20 +630,23 @@ Aturan owner tools:
 
 ## 14. Downloader
 
-Downloader menggunakan `yt-dlp` sebagai backend untuk TikTok publik dan Instagram Reels publik. Jangan gunakan API random dari GitHub, TikWM, Cobalt, atau scraper metadata HTML sebagai strategi utama.
+Downloader menggunakan `yt-dlp` sebagai backend untuk TikTok publik, Instagram Reels, dan satu Instagram Story berdasarkan URL spesifik. Jangan gunakan API random dari GitHub, TikWM, Cobalt, atau scraper metadata HTML sebagai strategi utama.
 
 Command:
 
 ```
 .tt <link>
 .ig <link>
+.igstory <link>
 ```
 
 Batasan:
 
 - TikTok hanya untuk video publik
 - Instagram hanya untuk Reels publik
-- Instagram Story tidak dibuat di versi awal
+- Instagram Story hanya diproses berdasarkan URL story spesifik
+- Instagram Story tidak boleh mengambil seluruh story suatu akun
+- Instagram Story memakai cookie akun yang sah melalui `YTDLP_COOKIES_FILE`
 - Private content tidak didukung
 - Tidak membuat bypass login Instagram
 - Tidak perlu pilihan kualitas
@@ -639,6 +658,7 @@ Batasan:
 - File sementara dihapus setelah proses selesai
 - `yt-dlp` dan `ffmpeg` wajib tersedia di VPS
 - Jika Instagram publik tetap gagal karena pembatasan platform, gunakan cookie file hanya untuk akun bot yang sah melalui `YTDLP_COOKIES_FILE`
+- Jangan commit atau log isi cookie Instagram
 
 Validasi link:
 
@@ -763,6 +783,7 @@ _Contoh: *.nyerah kuis*_
 📥 *DOWNLOADER*
 *.tt <link>* - Download TikTok
 *.ig <link>* - Download Instagram Reels
+*.igstory <link>* - Download Instagram Story
 
 🖼 *MEDIA*
 *.s* - Reply gambar jadi sticker
@@ -771,6 +792,14 @@ _Contoh: *.nyerah kuis*_
 👋 *ADMIN*
 *.welcome on/off* - Atur welcome
 *.setwelcome <pesan>* - Ubah welcome
+
+*MODERASI*
+*.kick @user* - Keluarkan member
+*.promote @user* - Jadikan admin
+*.demote @user* - Turunkan admin
+*.del* - Hapus pesan reply
+*.tagall <pesan>* - Pengumuman grup
+*.antilink on/off* - Anti link grup WhatsApp
 
 _Prefix: ._
 _Setiap download memakai 1 limit._
@@ -822,6 +851,7 @@ model Group {
   isApproved     Boolean  @default(false)
   welcomeEnabled Boolean  @default(false)
   welcomeMessage String?
+  antiLinkEnabled Boolean @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
@@ -1049,7 +1079,7 @@ kogbot/
 ├── .gitignore
 ├── package.json
 ├── tsconfig.json
-├── ecosystem.config.js
+├── ecosystem.config.cjs
 └── README.md
 ```
 
@@ -1091,7 +1121,15 @@ Gunakan `yt-dlp` sebagai backend downloader.
 
 - `.ig <link>` menjalankan `yt-dlp` di background.
 - Hanya link Instagram Reels publik yang diproses.
-- Instagram Story dan Instagram private tidak didukung.
+
+### Instagram Story
+
+- `.igstory <link>` menjalankan `yt-dlp` di background.
+- Hanya memproses satu URL story spesifik.
+- Gunakan cookie akun Instagram yang sah melalui `YTDLP_COOKIES_FILE`.
+- Jangan mengambil seluruh story dari suatu akun.
+- Jangan membuat bypass login atau akses ilegal ke konten yang tidak dapat diakses akun cookie.
+- Cookie Instagram tidak boleh disimpan di git atau ditulis ke log.
 
 Aturan implementasi:
 
@@ -1129,7 +1167,50 @@ Non-owner tidak boleh menjalankan reset poin.
 
 ---
 
-## 23. Error Handling
+## 23. Moderasi Grup
+
+Command:
+
+```text
+.kick @user
+.promote @user
+.demote @user
+.del
+.tagall <pesan>
+.antilink on
+.antilink off
+```
+
+Hierarki role:
+
+```text
+Owner Bot
+Admin Grup
+Member
+```
+
+Aturan:
+
+- Owner memiliki hak moderasi tertinggi.
+- Admin dapat kick member biasa dan promote member.
+- Admin tidak dapat kick owner atau admin lain.
+- Hanya owner yang dapat demote admin.
+- `.del` wajib memakai reply pesan target.
+- Owner dapat menghapus pesan siapa pun.
+- Admin dapat menghapus pesan member atau admin lain, tetapi tidak dapat menghapus pesan owner.
+- `.tagall` hanya untuk pengumuman grup, bukan hidden tag.
+- `.tagall` memiliki cooldown 10 menit per grup.
+- Mention `.tagall` maksimal 100 member dan tidak mention bot sendiri.
+- `.antilink` hanya mendeteksi link undangan grup WhatsApp.
+- Anti link tidak boleh menindak TikTok, Instagram, YouTube, atau website biasa.
+- Owner dan admin tidak terkena anti link.
+- Member yang melanggar anti link langsung dihapus pesannya dan dikeluarkan tanpa warning.
+- Jangan membuat `.warnlist` atau `.clearwarn`.
+- Bot wajib menjadi admin grup untuk kick, promote, demote, delete message, dan enforcement anti link.
+
+---
+
+## 24. Error Handling
 
 Setiap error harus ditangani, tidak boleh membuat bot crash.
 
@@ -1150,19 +1231,30 @@ Pesan error standar:
 
 ---
 
-## 24. Deployment
+## 25. Deployment
 
 Setup di VPS Ubuntu dengan PM2:
 
 ```bash
 npm install
 npx prisma generate
-npx prisma migrate dev
-npx prisma db seed
+npx prisma migrate deploy
+npm run seed
 npm run build
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.cjs
 pm2 save
 pm2 startup
+```
+
+Update project di VPS:
+
+```bash
+git pull
+npm install
+npx prisma migrate deploy
+npx prisma generate
+npm run build
+pm2 restart kogbot
 ```
 
 Scripts di `package.json`:
@@ -1180,7 +1272,7 @@ Scripts di `package.json`:
 }
 ```
 
-File `ecosystem.config.js`:
+File `ecosystem.config.cjs`:
 
 ```js
 module.exports = {
@@ -1201,7 +1293,7 @@ module.exports = {
 
 ---
 
-## 25. Development Priority
+## 26. Development Priority
 
 Kerjakan berurutan, jangan loncat tahap:
 
@@ -1229,7 +1321,7 @@ Downloader dikerjakan setelah command, database, whitelist, dan game selesai.
 
 ---
 
-## 26. Acceptance Criteria
+## 27. Acceptance Criteria
 
 Project dianggap selesai jika:
 
@@ -1279,10 +1371,18 @@ Project dianggap selesai jika:
 44. Bot bisa dijalankan dengan PM2 di VPS Ubuntu.
 45. Error tidak membuat bot crash.
 46. Session WhatsApp tersimpan di folder `sessions/`.
+47. `.igstory <link>` hanya memproses satu story berdasarkan URL spesifik.
+48. `.igstory` memakai cookie akun sah dan tidak mengambil seluruh story akun.
+49. `.kick`, `.promote`, dan `.demote` mengikuti hierarki owner, admin, member.
+50. `.del` wajib reply pesan target dan mengikuti permission role.
+51. `.tagall <pesan>` hanya owner/admin, cooldown 10 menit, dan bukan hidden tag.
+52. `.antilink on/off` hanya mendeteksi link undangan grup WhatsApp.
+53. Anti link tidak menindak TikTok, Instagram, YouTube, atau website biasa.
+54. Tidak ada warning system, `.warnlist`, atau `.clearwarn`.
 
 ---
 
-## 27. Important Notes
+## 28. Important Notes
 
 - Bot ini untuk penggunaan pribadi di grup kecil.
 - Gunakan nomor second khusus bot, bukan nomor pribadi.

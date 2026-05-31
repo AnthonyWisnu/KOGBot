@@ -1129,7 +1129,7 @@ Saat mengerjakan tahap manapun:
 
 ---
 
-## Tahap 36 - PLAN Moderasi Grup
+## Tahap 36 - PLAN Moderasi Grup (Selesai)
 
 Tujuan:
 
@@ -1460,7 +1460,7 @@ Testing checklist:
 
 ---
 
-## Tahap 37 - Schema dan Group Service Anti Link
+## Tahap 37 - Schema dan Group Service Anti Link (Selesai)
 
 Tujuan:
 
@@ -1485,7 +1485,7 @@ Verifikasi:
 
 ---
 
-## Tahap 38 - Helper Metadata Role Moderasi
+## Tahap 38 - Helper Metadata Role Moderasi (Selesai)
 
 Tujuan:
 
@@ -1511,7 +1511,7 @@ Verifikasi:
 
 ---
 
-## Tahap 39 - Command Kick Promote Demote
+## Tahap 39 - Command Kick Promote Demote (Selesai)
 
 Tujuan:
 
@@ -1546,7 +1546,7 @@ Verifikasi:
 
 ---
 
-## Tahap 40 - Command Tagall dengan Cooldown
+## Tahap 40 - Command Tagall dengan Cooldown (Selesai)
 
 Tujuan:
 
@@ -1575,7 +1575,7 @@ Verifikasi:
 
 ---
 
-## Tahap 41 - Anti Link Grup WhatsApp
+## Tahap 41 - Anti Link Grup WhatsApp (Selesai)
 
 Tujuan:
 
@@ -1613,7 +1613,7 @@ Verifikasi:
 
 ---
 
-## Tahap 42 - Menu, Dokumentasi, dan Acceptance Test Moderasi
+## Tahap 42 - Menu, Dokumentasi, dan Acceptance Test Moderasi (Selesai)
 
 Tujuan:
 
@@ -1634,5 +1634,222 @@ Verifikasi:
 - Tidak ada `.clearwarn`.
 - Dokumentasi menyebut anti link hanya untuk grup WhatsApp.
 - Dokumentasi melarang hidden tag.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.
+
+---
+
+## Tahap 43 - Downloader Instagram Story (Selesai)
+
+Tujuan:
+
+Menambahkan `.igstory <link>` untuk mengunduh satu Instagram Story berdasarkan URL spesifik yang diberikan user.
+
+Scope:
+
+- Command:
+  - `.igstory <link>`
+- Hanya memproses URL story Instagram spesifik:
+  - `https://www.instagram.com/stories/<username>/<story_id>/`
+- Tidak mengambil seluruh story dari suatu akun.
+- Tidak melakukan bypass login.
+- Gunakan cookie Instagram yang sah melalui `YTDLP_COOKIES_FILE`.
+- Cookie tidak boleh disimpan di git.
+- Story hanya boleh diproses jika dapat diakses oleh akun cookie yang dikonfigurasi secara sah.
+- Terapkan limit downloader yang sama seperti `.tt` dan `.ig`.
+- Owner tetap unlimited.
+
+Analisis existing:
+
+- Validasi URL downloader ada di `src/utils/downloaderValidation.ts`.
+- Eksekusi `yt-dlp` ada di `src/services/downloader.service.ts`.
+- Command downloader ada di `src/commands/downloader.command.ts`.
+- Reserve dan refund limit ada di `src/services/downloadLimit.service.ts`.
+- Router ada di `src/commands/index.ts`.
+
+File yang akan diubah:
+
+- `src/utils/downloaderValidation.ts`
+  - Tambahkan validator URL Instagram Story.
+- `src/services/downloader.service.ts`
+  - Tambahkan fungsi download story menggunakan pipeline `yt-dlp` existing.
+- `src/commands/downloader.command.ts`
+  - Tambahkan handler `.igstory`.
+- `src/commands/index.ts`
+  - Daftarkan `.igstory`.
+- `src/commands/menu.command.ts`
+  - Tambahkan `.igstory <link>`.
+- `.env.example`
+  - Pastikan `YTDLP_COOKIES_FILE` terdokumentasi.
+- `.gitignore`
+  - Pastikan cookie file tidak dapat ikut commit.
+
+Flow `.igstory <link>`:
+
+1. Pastikan command dijalankan di grup approved.
+2. Validasi URL hanya Instagram Story spesifik.
+3. Reserve 1 limit user, kecuali owner.
+4. Jalankan `yt-dlp` dengan cookie file yang dikonfigurasi.
+5. Pastikan output media maksimal 50 MB.
+6. Kirim media ke WhatsApp.
+7. Jika proses gagal, refund limit.
+8. Hapus temporary file setelah sukses maupun gagal.
+
+Risiko teknis:
+
+- Instagram Story hampir selalu memerlukan sesi login yang valid.
+- Cookie bisa kadaluarsa dan perlu diperbarui manual.
+- Story bisa sudah expired atau tidak dapat diakses akun cookie.
+- Jangan log isi cookie.
+- Jangan commit `cookies.txt` atau file export cookie lain.
+
+Verifikasi:
+
+- `.igstory <link>` valid memproses satu story.
+- URL bukan story ditolak.
+- Story expired memberi pesan error ramah.
+- Cookie tidak tersedia memberi pesan error jelas.
+- Download gagal tidak mengurangi limit.
+- Download sukses mengurangi 1 limit user biasa.
+- Owner tidak kehilangan limit.
+- Temporary file dihapus.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.
+
+---
+
+## Tahap 44 - Delete Message Reply-Based (Selesai)
+
+Tujuan:
+
+Menambahkan `.del` untuk menghapus pesan grup yang di-reply oleh owner atau admin.
+
+Command:
+
+```txt
+.del
+```
+
+Aturan permission:
+
+- Owner dapat menghapus pesan siapa pun.
+- Admin dapat menghapus pesan member biasa.
+- Admin dapat menghapus pesan admin lain.
+- Admin tidak dapat menghapus pesan owner.
+- Member biasa tidak dapat memakai `.del`.
+- Bot wajib menjadi admin grup.
+- Command wajib dilakukan dengan reply ke pesan target.
+
+File yang akan dibuat:
+
+- `src/commands/deleteMessage.command.ts`
+  - Validasi reply, role sender, role target, dan bot admin.
+- `src/services/deleteMessage.service.ts`
+  - Hapus pesan menggunakan Baileys.
+
+File yang akan diubah:
+
+- `src/commands/index.ts`
+  - Daftarkan `.del`.
+- `src/commands/menu.command.ts`
+  - Tambahkan `.del` pada kategori moderasi.
+- `src/utils/mentions.ts` atau utility baru
+  - Tambahkan helper mengambil participant pesan yang di-reply jika diperlukan.
+
+Flow `.del`:
+
+1. Pastikan command dijalankan di grup.
+2. Pastikan sender owner atau admin grup.
+3. Pastikan bot admin grup.
+4. Pastikan command me-reply pesan target.
+5. Ambil stanza ID dan participant target dari quoted context.
+6. Resolve variasi JID PN/LID memakai metadata grup jika diperlukan.
+7. Jika sender admin dan target owner, tolak.
+8. Kirim delete message:
+
+```ts
+socket.sendMessage(groupJid, {
+  delete: {
+    remoteJid: groupJid,
+    id: quotedMessageId,
+    participant: targetJid,
+    fromMe: false,
+  },
+});
+```
+
+9. Log error jika Baileys menolak penghapusan, tanpa crash.
+
+Pesan validasi:
+
+```txt
+Reply pesan yang ingin dihapus dengan command .del.
+```
+
+```txt
+Bot harus menjadi admin grup untuk menghapus pesan.
+```
+
+```txt
+Admin grup tidak dapat menghapus pesan owner bot.
+```
+
+Verifikasi:
+
+- Owner bisa hapus pesan member.
+- Owner bisa hapus pesan admin.
+- Admin bisa hapus pesan member.
+- Admin bisa hapus pesan admin lain.
+- Admin tidak bisa hapus pesan owner.
+- Member ditolak.
+- Tanpa reply ditolak.
+- Bot belum admin memberi pesan error.
+- Error Baileys tidak membuat bot crash.
+- `npm run build` berhasil.
+- `npm run lint` berhasil.
+
+---
+
+## Tahap 45 - Menu, Dokumentasi, dan Acceptance Test Scope Terbaru (Selesai)
+
+Tujuan:
+
+Finalisasi scope terbaru dari `Codex.md` setelah moderasi, Instagram Story, dan delete message selesai.
+
+Pekerjaan:
+
+- Update kategori `DOWNLOADER`:
+  - `.igstory <link>`
+- Update kategori `MODERASI`:
+  - `.kick @user`
+  - `.promote @user`
+  - `.demote @user`
+  - `.del`
+  - `.tagall <pesan>`
+  - `.antilink on/off`
+- Update `README.md`.
+- Update `AGENT.md`.
+- Tambahkan checklist deploy VPS:
+  - `git pull`
+  - `npm install`
+  - `npx prisma migrate deploy`
+  - `npx prisma generate`
+  - `npm run build`
+  - `pm2 restart kogbot`
+- Tambahkan manual test WhatsApp live.
+
+Acceptance criteria:
+
+- `.igstory <link>` memproses satu story yang dapat diakses akun cookie.
+- `.igstory` tidak mengambil semua story suatu akun.
+- Cookie tidak ikut git.
+- `.del` hanya bekerja dengan reply.
+- Permission `.del` sesuai role.
+- Fitur moderasi Tahap 37-42 berjalan.
+- Menu menampilkan command terbaru.
+- Tidak ada hidden tag.
+- Tidak ada warning system.
+- Tidak ada `.warnlist`.
+- Tidak ada `.clearwarn`.
 - `npm run build` berhasil.
 - `npm run lint` berhasil.

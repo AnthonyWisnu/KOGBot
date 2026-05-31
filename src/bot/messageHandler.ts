@@ -21,6 +21,7 @@ import {
   ensureGroup,
   isGroupApproved,
 } from '../services/group.service.js';
+import { enforceAntiLink } from '../services/antiLink.service.js';
 import type { CommandContext, ParsedCommand } from '../types/command.js';
 import { logger } from '../utils/logger.js';
 
@@ -100,7 +101,15 @@ async function handleIncomingMessage(
         }
       }
 
+      if (isGroup && await handleAntiLinkMessage(context)) {
+        return;
+      }
+
       await handlePlainMessage(context);
+      return;
+    }
+
+    if (isGroup && await handleAntiLinkMessage(context)) {
       return;
     }
 
@@ -114,6 +123,35 @@ async function handleIncomingMessage(
       },
       'Gagal memproses pesan masuk',
     );
+  }
+}
+
+async function handleAntiLinkMessage(context: CommandContext): Promise<boolean> {
+  try {
+    const result = await enforceAntiLink({
+      socket: context.socket,
+      message: context.message,
+      groupJid: context.chatJid,
+      senderJid: context.senderJid,
+      text: context.text,
+    });
+
+    if (result.status === 'bot_not_admin') {
+      await context.reply('Anti link aktif, tetapi bot harus menjadi admin grup untuk menindak pelanggaran.');
+      return true;
+    }
+
+    return result.status === 'enforced';
+  } catch (error) {
+    logger.error(
+      {
+        error,
+        chatJid: context.chatJid,
+        senderJid: context.senderJid,
+      },
+      'Gagal menjalankan anti link',
+    );
+    return false;
   }
 }
 

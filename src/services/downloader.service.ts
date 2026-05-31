@@ -12,6 +12,7 @@ import {
 } from '../utils/tempFile.js';
 import {
   assertInstagramReelUrl,
+  assertInstagramStoryUrl,
   assertTikTokUrl,
 } from '../utils/downloaderValidation.js';
 import { logger } from '../utils/logger.js';
@@ -22,6 +23,10 @@ const requestTimeoutMs = 30000;
 type DownloadedVideo = {
   filePath: string;
   title?: string;
+};
+
+export type DownloadedInstagramStory = DownloadedVideo & {
+  mediaType: 'image' | 'video';
 };
 
 type TikwmResponse = {
@@ -62,6 +67,23 @@ export async function downloadInstagramReelVideo(url: string): Promise<Downloade
     return await downloadWithYtDlp(url);
   } catch (error) {
     logger.error({ error, url }, 'Gagal download video Instagram');
+    throw error;
+  }
+}
+
+export async function downloadInstagramStoryMedia(url: string): Promise<DownloadedInstagramStory> {
+  try {
+    assertInstagramStoryUrl(url);
+    await assertInstagramCookiesAvailable();
+
+    const result = await downloadWithYtDlp(url);
+
+    return {
+      ...result,
+      mediaType: isImageFile(result.filePath) ? 'image' : 'video',
+    };
+  } catch (error) {
+    logger.error({ error, url }, 'Gagal download Instagram Story');
     throw error;
   }
 }
@@ -251,7 +273,7 @@ function parseYtDlpOutput(stdout: string): { filePath?: string; title?: string }
     .map((line) => line.trim())
     .filter(Boolean);
   const filePath = [...lines].reverse().find((line) => {
-    return /\.(mp4|mkv|webm|mov)$/i.test(line);
+    return /\.(mp4|mkv|webm|mov|jpe?g|png|webp)$/i.test(line);
   });
   const title = lines.find((line) => line !== filePath);
 
@@ -275,6 +297,22 @@ async function findDownloadedFile(outputTemplate: string): Promise<string> {
   await access(filePath);
 
   return filePath;
+}
+
+async function assertInstagramCookiesAvailable(): Promise<void> {
+  if (!env.YTDLP_COOKIES_FILE) {
+    throw new Error('Cookie Instagram belum dikonfigurasi');
+  }
+
+  try {
+    await access(env.YTDLP_COOKIES_FILE);
+  } catch {
+    throw new Error('Cookie Instagram tidak ditemukan');
+  }
+}
+
+function isImageFile(filePath: string): boolean {
+  return /\.(jpe?g|png|webp)$/i.test(filePath);
 }
 
 function normalizeYtDlpError(error: Error): Error {

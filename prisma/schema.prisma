@@ -16,14 +16,15 @@ model User {
 }
 
 model Group {
-  id             String   @id @default(cuid())
-  jid            String   @unique
-  name           String?
-  isApproved     Boolean  @default(false)
-  welcomeEnabled Boolean  @default(false)
-  welcomeMessage String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(cuid())
+  jid             String   @unique
+  name            String?
+  isApproved      Boolean  @default(false)
+  welcomeEnabled  Boolean  @default(false)
+  welcomeMessage  String?
+  antiLinkEnabled Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model WeeklyScore {

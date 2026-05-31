@@ -42,6 +42,7 @@ import {
   handleInstagramDownloadCommand,
   handleTikTokDownloadCommand,
 } from './downloader.command.js';
+import { handleInstagramStoryDownloadCommand } from './instagramStory.command.js';
 import {
   handleStickerCommand,
   handleStickerToImageCommand,
@@ -52,6 +53,14 @@ import {
 } from './downloadLimit.command.js';
 import { handleTransferLimitCommand } from './transferLimit.command.js';
 import { handleDailyCommand } from './daily.command.js';
+import {
+  handleDemoteCommand,
+  handleKickCommand,
+  handlePromoteCommand,
+} from './moderation.command.js';
+import { handleTagAllCommand } from './tagAll.command.js';
+import { handleAntiLinkCommand } from './antiLink.command.js';
+import { handleDeleteMessageCommand } from './deleteMessage.command.js';
 import { logger } from '../utils/logger.js';
 
 const unknownCommandMessage = `Command tidak dikenal. Ketik ${env.BOT_PREFIX}menu untuk melihat daftar fitur.`;
@@ -65,6 +74,12 @@ const commandHandlers = new Map<string, CommandHandler>([
   ['belilimit', handleBuyLimitCommand],
   ['transferlimit', handleTransferLimitCommand],
   ['daily', handleDailyCommand],
+  ['kick', handleKickCommand],
+  ['promote', handlePromoteCommand],
+  ['demote', handleDemoteCommand],
+  ['tagall', handleTagAllCommand],
+  ['antilink', handleAntiLinkCommand],
+  ['del', handleDeleteMessageCommand],
   ['kuis', handleQuizCommand],
   ['family100', handleFamily100Command],
   ['tebakkata', handleWordScrambleCommand],
@@ -76,6 +91,7 @@ const commandHandlers = new Map<string, CommandHandler>([
   ['setwelcome', handleSetWelcomeCommand],
   ['tt', handleTikTokDownloadCommand],
   ['ig', handleInstagramDownloadCommand],
+  ['igstory', handleInstagramStoryDownloadCommand],
   ['s', handleStickerCommand],
   ['gambar', handleStickerToImageCommand],
 ]);

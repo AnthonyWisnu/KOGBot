@@ -17,6 +17,7 @@ KOGBot adalah project bot WhatsApp berbasis Node.js dan TypeScript untuk grup pr
 - Welcome member baru dan pesan perpisahan member keluar
 - Downloader TikTok publik via `yt-dlp`
 - Downloader Instagram Reels publik via `yt-dlp`
+- Downloader satu Instagram Story spesifik via `yt-dlp` dan cookie akun sah
 - Gambar jadi sticker dengan reply `.s`
 - Sticker jadi gambar dengan reply `.gambar`
 - Limit downloader per user per grup
@@ -25,6 +26,10 @@ KOGBot adalah project bot WhatsApp berbasis Node.js dan TypeScript untuk grup pr
 - Owner unlimited poin dan limit
 - Reset poin manual oleh owner dengan konfirmasi
 - Owner tools untuk give poin, give limit, dan reset limit
+- Moderasi grup: kick, promote, dan demote
+- Hapus pesan grup dengan reply `.del`
+- Pengumuman grup dengan `.tagall <pesan>` dan cooldown 10 menit
+- Anti link undangan grup WhatsApp dengan `.antilink on/off`
 
 ## Setup Lokal
 
@@ -118,14 +123,15 @@ SESSION_DIR=./sessions
 TEMP_DIR=./temp
 MAX_DOWNLOAD_MB=50
 YTDLP_BINARY=yt-dlp
+# YTDLP_COOKIES_FILE=./cookies.txt
 TIMEZONE=Asia/Jakarta
 ```
 
-Generate Prisma client, migration, dan seed:
+Generate Prisma client, jalankan migration production, dan isi seed:
 
 ```bash
-npm run prisma:generate
-npm run prisma:migrate
+npx prisma generate
+npx prisma migrate deploy
 npm run seed
 ```
 
@@ -152,8 +158,10 @@ pm2 logs kogbot
 Restart setelah update:
 
 ```bash
+git pull
 npm install
-npm run prisma:generate
+npx prisma migrate deploy
+npx prisma generate
 npm run build
 pm2 restart kogbot
 ```
@@ -166,10 +174,40 @@ pm2 restart kogbot
 - Gunakan nomor WhatsApp second khusus bot.
 - Bot hanya aktif di grup yang sudah menjalankan `.approvegroup` atau `.approvegrup` oleh owner.
 - Downloader hanya mendukung TikTok publik dan Instagram Reels publik.
-- Instagram Story dan Instagram private tidak didukung.
+- Instagram Story hanya diproses melalui `.igstory <link>` untuk satu URL story spesifik yang dapat diakses akun cookie secara sah.
+- Simpan cookie Instagram di VPS sebagai `cookies.txt`, aktifkan `YTDLP_COOKIES_FILE=./cookies.txt`, dan jangan commit file tersebut.
+- Konten private yang tidak dapat diakses akun cookie tidak didukung.
 - Setiap download sukses memakai 1 limit. Download gagal tidak mengurangi limit.
 - Owner selalu tampil memiliki 999 poin dan 999 limit tanpa menyimpan nilai 999 permanen di database.
 - Poin tidak direset otomatis. Reset poin hanya manual oleh owner dengan `.resetpoin` lalu `.confirmresetpoin`.
+- `.tagall` hanya mengirim pengumuman yang terlihat, bukan hidden tag. Mention dibatasi maksimal 100 participant dan bot tidak ikut dimention.
+- Anti link hanya mendeteksi undangan grup `chat.whatsapp.com`. Link TikTok, Instagram, YouTube, dan website biasa tidak ditindak.
+- Bot wajib menjadi admin grup untuk menjalankan kick, promote, demote, hapus pesan, dan enforcement anti link.
+- Moderasi tidak memakai sistem warning, `.warnlist`, atau `.clearwarn`.
+
+## Moderasi Grup
+
+Command moderasi:
+
+```text
+.kick @user           - Keluarkan member
+.promote @user        - Jadikan member sebagai admin
+.demote @user         - Turunkan admin menjadi member
+.del                  - Hapus pesan yang di-reply
+.tagall <pesan>       - Kirim pengumuman grup
+.antilink on/off      - Atur anti link undangan grup WhatsApp
+```
+
+Aturan role:
+
+- Owner dapat kick member atau admin, promote member, dan demote admin.
+- Admin dapat kick member biasa dan promote member.
+- Admin tidak dapat kick owner, kick admin lain, atau demote admin.
+- Owner dapat menghapus pesan siapa pun dengan reply `.del`.
+- Admin dapat menghapus pesan member atau admin lain, tetapi tidak dapat menghapus pesan owner.
+- Member biasa tidak dapat menjalankan command moderasi.
+- `.tagall` memiliki cooldown 10 menit per grup.
+- Anti link langsung menghapus pesan undangan grup WhatsApp dan mengeluarkan member pelanggar tanpa warning.
 
 ## Manual Test WhatsApp Live
 
@@ -185,8 +223,19 @@ Jalankan setelah bot berhasil login dan masuk ke grup uji:
 8. Jalankan `.transferlimit @user 1`. Pastikan pengirim berkurang dan penerima bertambah.
 9. Jalankan `.daily` dua kali. Klaim pertama berhasil, klaim kedua menampilkan sisa waktu.
 10. Test `.tt <link>` dan `.ig <link>` publik. Pastikan limit hanya berkurang setelah video berhasil dikirim.
-11. Reply gambar dengan `.s`, lalu reply sticker dengan `.gambar`.
-12. Aktifkan `.welcome on`, lalu test member masuk dan keluar.
-13. Owner menjalankan `.resetpoin`, lalu `.confirmresetpoin` dalam 30 detik.
-14. Owner menjalankan `.givepoin @user 10`, `.givelimit @user 5`, dan `.resetlimit @user`.
-15. Cek `pm2 logs kogbot` dan pastikan tidak ada crash.
+11. Test `.igstory <link>` memakai satu URL story spesifik. Pastikan story gambar atau video terkirim dan kegagalan tidak mengurangi limit.
+12. Reply gambar dengan `.s`, lalu reply sticker dengan `.gambar`.
+13. Aktifkan `.welcome on`, lalu test member masuk dan keluar.
+14. Owner menjalankan `.resetpoin`, lalu `.confirmresetpoin` dalam 30 detik.
+15. Owner menjalankan `.givepoin @user 10`, `.givelimit @user 5`, dan `.resetlimit @user`.
+16. Jadikan bot admin grup, lalu test owner menjalankan `.kick @member`, `.promote @member`, dan `.demote @admin`.
+17. Test admin menjalankan `.kick @member` dan `.promote @member`. Pastikan admin ditolak saat mencoba `.kick @admin`, `.kick @owner`, atau `.demote @admin`.
+18. Test member biasa menjalankan `.kick`, `.promote`, `.demote`, `.tagall`, dan `.antilink on`. Pastikan semuanya ditolak.
+19. Reply pesan member dan admin dengan `.del` memakai owner. Pastikan pesan terhapus.
+20. Reply pesan member dan admin lain dengan `.del` memakai admin. Pastikan pesan terhapus. Reply pesan owner dan pastikan ditolak.
+21. Jalankan `.del` tanpa reply dan memakai member biasa. Pastikan keduanya ditolak.
+22. Jalankan `.tagall Pengumuman test`, lalu ulangi sebelum 10 menit. Pastikan pengiriman kedua ditolak oleh cooldown.
+23. Jalankan `.antilink on`, lalu kirim link `chat.whatsapp.com` memakai akun member. Pastikan pesan dihapus dan member dikeluarkan.
+24. Saat anti link aktif, kirim link TikTok, Instagram, YouTube, dan website biasa. Pastikan tidak ditindak.
+25. Jalankan `.antilink off`, lalu kirim link grup WhatsApp memakai member. Pastikan tidak ditindak.
+26. Cek `pm2 logs kogbot` dan pastikan tidak ada crash.
