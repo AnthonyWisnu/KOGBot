@@ -6,6 +6,7 @@ import { getDisplayWeeklyScore, getWeekStartJakarta } from './score.service.js';
 import { getOrCreateUserStats } from './userStats.service.js';
 import { normalizeJid } from '../utils/jid.js';
 import { logger } from '../utils/logger.js';
+import { getUserNumberLabel } from '../utils/userDisplay.js';
 
 export type UserProfile = {
   userJid: string;
@@ -49,7 +50,7 @@ export async function getUserProfile(params: {
 
     return {
       userJid,
-      displayName: preferredName ?? user.name ?? 'Member WhatsApp',
+      displayName: preferredName ?? user.name ?? getUserNumberLabel(userJid),
       points,
       limit: limitStatus.limit,
       rank: isOwner(userJid) ? 'Owner' : await getUserRank(normalizedParams, points),

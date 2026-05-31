@@ -6,12 +6,9 @@ import {
   addDownloadLimit,
   resetDownloadLimit,
 } from '../services/downloadLimit.service.js';
-import { formatMention } from '../utils/format.js';
-import {
-  getMentionLabelFromText,
-  resolveFirstMentionedJid,
-} from '../utils/mentions.js';
+import { resolveFirstMentionedJid } from '../utils/mentions.js';
 import { logger } from '../utils/logger.js';
+import { resolveGroupUserDisplay } from '../utils/userDisplay.js';
 import {
   handleConfirmResetPointCommand,
   handleResetPointCommand,
@@ -182,7 +179,11 @@ async function handleGivePoint(context: CommandContext): Promise<void> {
       return;
     }
 
-    const targetLabel = getMentionLabelFromText(context.command.rawArgs) ?? formatMention(targetJid);
+    const targetDisplay = await resolveGroupUserDisplay({
+      socket: context.socket,
+      groupJid: context.chatJid,
+      userJid: targetJid,
+    });
     const amount = parsePositiveInteger(context.command.args.at(-1));
 
     if (!amount) {
@@ -201,10 +202,10 @@ async function handleGivePoint(context: CommandContext): Promise<void> {
     await replyWithMentions(
       context,
       [
-        `Berhasil memberi ${amount} poin ke ${targetLabel}.`,
+        `Berhasil memberi ${amount} poin ke ${targetDisplay.label}.`,
         `Poin user sekarang: ${score?.score ?? 999}`,
       ].join('\n'),
-      [targetJid],
+      [targetDisplay.userJid],
     );
   } catch (error) {
     logger.error({ error, chatJid: context.chatJid }, 'Gagal menjalankan command givepoin');
@@ -220,7 +221,11 @@ async function handleGiveLimit(context: CommandContext): Promise<void> {
       return;
     }
 
-    const targetLabel = getMentionLabelFromText(context.command.rawArgs) ?? formatMention(targetJid);
+    const targetDisplay = await resolveGroupUserDisplay({
+      socket: context.socket,
+      groupJid: context.chatJid,
+      userJid: targetJid,
+    });
     const amount = parsePositiveInteger(context.command.args.at(-1));
 
     if (!amount) {
@@ -237,10 +242,10 @@ async function handleGiveLimit(context: CommandContext): Promise<void> {
     await replyWithMentions(
       context,
       [
-        `Berhasil memberi ${amount} limit ke ${targetLabel}.`,
+        `Berhasil memberi ${amount} limit ke ${targetDisplay.label}.`,
         `Limit user sekarang: ${currentLimit}`,
       ].join('\n'),
-      [targetJid],
+      [targetDisplay.userJid],
     );
   } catch (error) {
     logger.error({ error, chatJid: context.chatJid }, 'Gagal menjalankan command givelimit');
@@ -256,19 +261,23 @@ async function handleResetLimit(context: CommandContext): Promise<void> {
       return;
     }
 
-    const targetLabel = getMentionLabelFromText(context.command.rawArgs) ?? formatMention(targetJid);
     const currentLimit = await resetDownloadLimit({
       userJid: targetJid,
       groupJid: context.chatJid,
+    });
+    const targetDisplay = await resolveGroupUserDisplay({
+      socket: context.socket,
+      groupJid: context.chatJid,
+      userJid: targetJid,
     });
 
     await replyWithMentions(
       context,
       [
-        `Limit ${targetLabel} sudah direset.`,
+        `Limit ${targetDisplay.label} sudah direset.`,
         `Limit user sekarang: ${currentLimit}`,
       ].join('\n'),
-      [targetJid],
+      [targetDisplay.userJid],
     );
   } catch (error) {
     logger.error({ error, chatJid: context.chatJid }, 'Gagal menjalankan command resetlimit');

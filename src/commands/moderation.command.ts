@@ -5,12 +5,9 @@ import {
   promoteGroupParticipant,
   type ModerationResult,
 } from '../services/moderation.service.js';
-import { formatMention } from '../utils/format.js';
-import {
-  getFirstMentionedJid,
-  getMentionLabelFromText,
-} from '../utils/mentions.js';
+import { getFirstMentionedJid } from '../utils/mentions.js';
 import { logger } from '../utils/logger.js';
+import { resolveGroupUserDisplay } from '../utils/userDisplay.js';
 
 export async function handleKickCommand(context: CommandContext): Promise<void> {
   await handleModerationCommand(context, 'kick');
@@ -41,6 +38,11 @@ async function handleModerationCommand(
       return;
     }
 
+    const targetDisplay = await resolveGroupUserDisplay({
+      socket: context.socket,
+      groupJid: context.chatJid,
+      userJid: targetJid,
+    });
     const result = await runModerationCommand(context, action, targetJid);
 
     if (result.status !== 'success') {
@@ -48,19 +50,17 @@ async function handleModerationCommand(
       return;
     }
 
-    const targetLabel = getMentionLabelFromText(context.command.rawArgs) ??
-      formatMention(result.targetJid);
     const successMessage = action === 'kick'
-      ? `${targetLabel} berhasil dikeluarkan dari grup.`
+      ? `${targetDisplay.label} berhasil dikeluarkan dari grup.`
       : action === 'promote'
-        ? `${targetLabel} berhasil dijadikan admin grup.`
-        : `${targetLabel} berhasil diturunkan dari admin grup.`;
+        ? `${targetDisplay.label} berhasil dijadikan admin grup.`
+        : `${targetDisplay.label} berhasil diturunkan dari admin grup.`;
 
     await context.socket.sendMessage(
       context.chatJid,
       {
         text: successMessage,
-        mentions: [result.targetJid],
+        mentions: [targetDisplay.userJid],
       },
       { quoted: context.message },
     );

@@ -2,12 +2,9 @@ import { env } from '../config/env.js';
 import { getUserProfile } from '../services/profile.service.js';
 import type { CommandContext } from '../types/command.js';
 import { resolveFirstMentionedJid } from '../utils/mentions.js';
-import {
-  findGroupParticipant,
-  getParticipantDisplayName,
-} from '../utils/groupMetadata.js';
 import { isSameUserJid } from '../utils/jid.js';
 import { logger } from '../utils/logger.js';
+import { resolveGroupUserDisplay } from '../utils/userDisplay.js';
 
 export async function handleProfileCommand(context: CommandContext): Promise<void> {
   try {
@@ -21,14 +18,18 @@ export async function handleProfileCommand(context: CommandContext): Promise<voi
       groupJid: context.chatJid,
       message: context.message.message,
     }) ?? context.senderJid;
-    const participantName = await getProfileParticipantName(context, targetJid);
-    const profile = await getUserProfile({
-      userJid: targetJid,
+    const targetDisplay = await resolveGroupUserDisplay({
+      socket: context.socket,
       groupJid: context.chatJid,
+      userJid: targetJid,
       pushName: isSameUserJid(targetJid, context.senderJid)
         ? context.message.pushName ?? undefined
         : undefined,
-      participantName,
+    });
+    const profile = await getUserProfile({
+      userJid: targetDisplay.userJid,
+      groupJid: context.chatJid,
+      pushName: targetDisplay.name,
     });
     const rankText = profile.rank ?? '-';
 
@@ -60,26 +61,5 @@ export async function handleProfileCommand(context: CommandContext): Promise<voi
       'Gagal menjalankan command profile',
     );
     throw error;
-  }
-}
-
-async function getProfileParticipantName(
-  context: CommandContext,
-  targetJid: string,
-): Promise<string | undefined> {
-  try {
-    const metadata = await context.socket.groupMetadata(context.chatJid);
-
-    return getParticipantDisplayName(findGroupParticipant(metadata, targetJid));
-  } catch (error) {
-    logger.warn(
-      {
-        error,
-        chatJid: context.chatJid,
-        targetJid,
-      },
-      'Gagal mengambil nama participant untuk profile',
-    );
-    return undefined;
   }
 }
