@@ -44,7 +44,7 @@ model UserDownloadLimit {
   id        String   @id @default(cuid())
   userJid   String
   groupJid  String
-  limit     Int      @default(3)
+  limit     Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

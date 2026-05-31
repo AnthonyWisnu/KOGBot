@@ -23,6 +23,7 @@ KOGBot adalah project bot WhatsApp berbasis Node.js dan TypeScript untuk grup pr
 - Limit downloader per user per grup
 - Transfer limit antar user
 - Daily reward 1 kali per 24 jam
+- Quote random dan quote berdasarkan kategori dengan `.quote`
 - Owner unlimited poin dan limit
 - Reset poin manual oleh owner dengan konfirmasi
 - Owner tools untuk give poin, give limit, dan reset limit
@@ -178,6 +179,7 @@ pm2 restart kogbot
 - Simpan cookie Instagram di VPS sebagai `cookies.txt`, aktifkan `YTDLP_COOKIES_FILE=./cookies.txt`, dan jangan commit file tersebut.
 - Konten private yang tidak dapat diakses akun cookie tidak didukung.
 - Setiap download sukses memakai 1 limit. Download gagal tidak mengurangi limit.
+- User biasa mendapat 1 limit default. `.resetlimit @user` mengembalikan limit target ke 1.
 - Owner selalu tampil memiliki 999 poin dan 999 limit tanpa menyimpan nilai 999 permanen di database.
 - Identitas user disimpan sebagai `[nomor]@s.whatsapp.net`. Record lama berformat `@lid` digabungkan otomatis saat metadata grup tersedia.
 - Poin tidak direset otomatis. Reset poin hanya manual oleh owner dengan `.resetpoin` lalu `.confirmresetpoin`.
@@ -194,6 +196,23 @@ npm run jid:merge -- "123456@lid=628123456789@s.whatsapp.net"
 ```
 
 Gunakan argumen mapping hanya jika record `@lid` masih tersisa setelah bot terkoneksi. Nilai limit duplikat memakai nilai terbesar, sedangkan poin dan jumlah kemenangan dijumlahkan.
+
+## Quote
+
+Command quote:
+
+```text
+.quote              - Quote random
+.quote <kategori>   - Quote berdasarkan kategori
+```
+
+Kategori tersedia:
+
+```text
+motivasi, lucu, islami, cinta, galau
+```
+
+Data quote dibaca dari file `quotes.json` di root project. Item string otomatis memakai author `Anonim`.
 
 ## Moderasi Grup
 
@@ -232,20 +251,22 @@ Jalankan setelah bot berhasil login dan masuk ke grup uji:
 7. Cek `.profile`, lalu `.profile @user`. Pastikan owner tampil 999 poin, 999 limit, dan rank Owner.
 8. Jalankan `.transferlimit @user 1`. Pastikan pengirim berkurang dan penerima bertambah.
 9. Jalankan `.daily` dua kali. Klaim pertama berhasil, klaim kedua menampilkan sisa waktu.
-10. Test `.tt <link>` dan `.ig <link>` publik. Pastikan limit hanya berkurang setelah video berhasil dikirim.
-11. Test `.igstory <link>` memakai satu URL story spesifik. Pastikan story gambar atau video terkirim dan kegagalan tidak mengurangi limit.
-12. Reply gambar dengan `.s`, lalu reply sticker dengan `.gambar`.
-13. Aktifkan `.welcome on`, lalu test member masuk dan keluar.
-14. Owner menjalankan `.resetpoin`, lalu `.confirmresetpoin` dalam 30 detik.
-15. Owner menjalankan `.givepoin @user 10`, `.givelimit @user 5`, dan `.resetlimit @user`.
-16. Jadikan bot admin grup, lalu test owner menjalankan `.kick @member`, `.promote @member`, dan `.demote @admin`.
-17. Test admin menjalankan `.kick @member` dan `.promote @member`. Pastikan admin ditolak saat mencoba `.kick @admin`, `.kick @owner`, atau `.demote @admin`.
-18. Test member biasa menjalankan `.kick`, `.promote`, `.demote`, `.tagall`, dan `.antilink on`. Pastikan semuanya ditolak.
-19. Reply pesan member dan admin dengan `.del` memakai owner. Pastikan pesan terhapus.
-20. Reply pesan member dan admin lain dengan `.del` memakai admin. Pastikan pesan terhapus. Reply pesan owner dan pastikan ditolak.
-21. Jalankan `.del` tanpa reply dan memakai member biasa. Pastikan keduanya ditolak.
-22. Jalankan `.tagall Pengumuman test`, lalu ulangi sebelum 10 menit. Pastikan pengiriman kedua ditolak oleh cooldown.
-23. Jalankan `.antilink on`, lalu kirim link `chat.whatsapp.com` memakai akun member. Pastikan pesan dihapus dan member dikeluarkan.
-24. Saat anti link aktif, kirim link TikTok, Instagram, YouTube, dan website biasa. Pastikan tidak ditindak.
-25. Jalankan `.antilink off`, lalu kirim link grup WhatsApp memakai member. Pastikan tidak ditindak.
-26. Cek `pm2 logs kogbot` dan pastikan tidak ada crash.
+10. Jalankan `.quote`, `.quote motivasi`, `.quote lucu`, `.quote islami`, `.quote cinta`, dan `.quote galau`.
+11. Jalankan `.quote salah` dan pastikan kategori valid ditampilkan.
+12. Test `.tt <link>` dan `.ig <link>` publik. Pastikan limit hanya berkurang setelah video berhasil dikirim.
+13. Test `.igstory <link>` memakai satu URL story spesifik. Pastikan story gambar atau video terkirim dan kegagalan tidak mengurangi limit.
+14. Reply gambar dengan `.s`, lalu reply sticker dengan `.gambar`.
+15. Aktifkan `.welcome on`, lalu test member masuk dan keluar.
+16. Owner menjalankan `.resetpoin`, lalu `.confirmresetpoin` dalam 30 detik.
+17. Owner menjalankan `.givepoin @user 10`, `.givelimit @user 5`, dan `.resetlimit @user`.
+18. Jadikan bot admin grup, lalu test owner menjalankan `.kick @member`, `.promote @member`, dan `.demote @admin`.
+19. Test admin menjalankan `.kick @member` dan `.promote @member`. Pastikan admin ditolak saat mencoba `.kick @admin`, `.kick @owner`, atau `.demote @admin`.
+20. Test member biasa menjalankan `.kick`, `.promote`, `.demote`, `.tagall`, dan `.antilink on`. Pastikan semuanya ditolak.
+21. Reply pesan member dan admin dengan `.del` memakai owner. Pastikan pesan terhapus.
+22. Reply pesan member dan admin lain dengan `.del` memakai admin. Pastikan pesan terhapus. Reply pesan owner dan pastikan ditolak.
+23. Jalankan `.del` tanpa reply dan memakai member biasa. Pastikan keduanya ditolak.
+24. Jalankan `.tagall Pengumuman test`, lalu ulangi sebelum 10 menit. Pastikan pengiriman kedua ditolak oleh cooldown.
+25. Jalankan `.antilink on`, lalu kirim link `chat.whatsapp.com` memakai akun member. Pastikan pesan dihapus dan member dikeluarkan.
+26. Saat anti link aktif, kirim link TikTok, Instagram, YouTube, dan website biasa. Pastikan tidak ditindak.
+27. Jalankan `.antilink off`, lalu kirim link grup WhatsApp memakai member. Pastikan tidak ditindak.
+28. Cek `pm2 logs kogbot` dan pastikan tidak ada crash.

@@ -61,6 +61,7 @@ import {
 import { handleTagAllCommand } from './tagAll.command.js';
 import { handleAntiLinkCommand } from './antiLink.command.js';
 import { handleDeleteMessageCommand } from './deleteMessage.command.js';
+import { handleQuoteCommand } from './quote.command.js';
 import { logger } from '../utils/logger.js';
 
 const unknownCommandMessage = `Command tidak dikenal. Ketik ${env.BOT_PREFIX}menu untuk melihat daftar fitur.`;
@@ -74,6 +75,7 @@ const commandHandlers = new Map<string, CommandHandler>([
   ['belilimit', handleBuyLimitCommand],
   ['transferlimit', handleTransferLimitCommand],
   ['daily', handleDailyCommand],
+  ['quote', handleQuoteCommand],
   ['kick', handleKickCommand],
   ['promote', handlePromoteCommand],
   ['demote', handleDemoteCommand],

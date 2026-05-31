@@ -24,6 +24,7 @@ Bangun WhatsApp bot yang stabil, modular, dan mudah dikembangkan dengan fitur ut
 - Owner unlimited poin dan limit
 - Profile user
 - Daily reward
+- Quote random dan quote berdasarkan kategori
 - Transfer limit antar user
 - Download TikTok publik tanpa watermark
 - Download Instagram Reels publik
@@ -228,7 +229,7 @@ Owner dapat:
 - Transfer limit tanpa mengurangi limit owner
 - Memberi poin ke user dengan `.givepoin`
 - Memberi limit ke user dengan `.givelimit`
-- Reset limit user ke 3 dengan `.resetlimit`
+- Reset limit user ke 1 dengan `.resetlimit`
 - Reset semua data jika diperlukan
 - Mengatur konfigurasi utama bot
 - Menggunakan semua command admin
@@ -566,6 +567,7 @@ Leaderboard          : .rank (top 10 per grup)
 Cek poin pribadi     : .poin
 Profile user         : .profile / .profile @user
 Daily reward         : .daily
+Quote                : .quote / .quote <kategori>
 Transfer limit       : .transferlimit @user <jumlah>
 Reset poin           : manual owner dengan konfirmasi
 ```
@@ -622,7 +624,7 @@ Aturan owner tools:
 
 - `.givepoin` menambah poin target pada grup tempat command dijalankan.
 - `.givelimit` menambah limit download target pada grup tempat command dijalankan.
-- `.resetlimit` mengembalikan limit target ke default 3.
+- `.resetlimit` mengembalikan limit target ke default 1.
 - Ketiganya hanya boleh dijalankan owner.
 - Jika target adalah owner, poin dan limit tetap tampil 999 tanpa menyimpan angka 999 permanen.
 
@@ -780,6 +782,11 @@ _Contoh: *.nyerah kuis*_
 *REWARD*
 *.daily* - Klaim hadiah harian
 
+💬 *QUOTE*
+*.quote* - Quote random
+*.quote <kategori>* - Quote berdasarkan kategori
+_Kategori: motivasi, lucu, islami, cinta, galau_
+
 📥 *DOWNLOADER*
 *.tt <link>* - Download TikTok
 *.ig <link>* - Download Instagram Reels
@@ -822,7 +829,7 @@ Owner Menu
 .resetpoin      - Reset poin grup dengan konfirmasi
 .givepoin @user jumlah  - Tambah poin user
 .givelimit @user jumlah - Tambah limit user
-.resetlimit @user       - Reset limit user ke 3
+.resetlimit @user       - Reset limit user ke 1
 ```
 
 ---
@@ -982,7 +989,7 @@ model UserDownloadLimit {
   id        String   @id @default(cuid())
   userJid   String
   groupJid  String
-  limit     Int      @default(3)
+  limit     Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

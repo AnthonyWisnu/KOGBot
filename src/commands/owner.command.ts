@@ -162,7 +162,7 @@ async function handleOwnerMenu(context: CommandContext): Promise<void> {
         `${env.BOT_PREFIX}resetpoin      - Reset poin grup dengan konfirmasi`,
         `${env.BOT_PREFIX}givepoin @user jumlah  - Tambah poin user`,
         `${env.BOT_PREFIX}givelimit @user jumlah - Tambah limit user`,
-        `${env.BOT_PREFIX}resetlimit @user       - Reset limit user ke 3`,
+        `${env.BOT_PREFIX}resetlimit @user       - Reset limit user ke 1`,
       ].join('\n'),
     );
   } catch (error) {

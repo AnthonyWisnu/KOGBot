@@ -4,7 +4,7 @@ import { normalizeJid } from '../utils/jid.js';
 import { logger } from '../utils/logger.js';
 import { addDownloadLimit } from './downloadLimit.service.js';
 
-const defaultDownloadLimit = 3;
+const defaultDownloadLimit = 1;
 
 export type TransferLimitResult =
   | {

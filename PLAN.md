@@ -1051,7 +1051,7 @@ Pekerjaan:
   - jumlah minimal 1 untuk give
 - `.givepoin` menambah poin target.
 - `.givelimit` menambah limit target.
-- `.resetlimit` mengembalikan limit target ke default 3.
+- `.resetlimit` mengembalikan limit target ke default 1.
 - Jika user target tidak ditemukan atau belum ada data yang relevan, balas pesan jelas.
 - Tambahkan command ke owner router dan owner menu.
 
@@ -1060,7 +1060,7 @@ Verifikasi:
 - Non-owner tidak bisa menjalankan command.
 - Owner bisa memberi poin.
 - Owner bisa memberi limit.
-- Owner bisa reset limit user menjadi 3.
+- Owner bisa reset limit user menjadi 1.
 - Jumlah 0, negatif, atau bukan angka ditolak.
 - Target tanpa mention ditolak.
 - `npm run build` berhasil.
@@ -1853,3 +1853,263 @@ Acceptance criteria:
 - Tidak ada `.clearwarn`.
 - `npm run build` berhasil.
 - `npm run lint` berhasil.
+
+---
+
+## Tahap 46 - Ubah Default Limit Download Menjadi 1 (Selesai)
+
+### 1. Ringkasan Perubahan
+
+Mengubah limit download awal dan nilai reset user biasa dari `3` menjadi `1`.
+
+Owner tetap unlimited dan tetap ditampilkan sebagai `999`. Harga pembelian limit tetap `10 poin = 1 limit`.
+
+### 2. Analisis Struktur Existing Hasil Scan
+
+Nilai default limit sebelum tahap ini muncul di beberapa tempat:
+
+- `src/services/downloadLimit.service.ts`
+  - `defaultDownloadLimit = 1`
+  - Dipakai saat membuat saldo awal, membeli limit pertama kali, menambah limit pertama kali, dan `.resetlimit`.
+- `src/services/transferLimit.service.ts`
+  - `defaultDownloadLimit = 1`
+  - Dipakai ketika sender atau penerima transfer belum mempunyai record limit.
+- `prisma/schema.prisma`
+  - `UserDownloadLimit.limit Int @default(1)`.
+- `src/commands/owner.command.ts`
+  - Teks owner menu menjelaskan `.resetlimit @user - Reset limit user ke 1`.
+- Dokumentasi existing masih menyebut nilai default `3`.
+
+### 3. File yang Akan Diubah
+
+- `src/services/downloadLimit.service.ts`
+- `src/services/transferLimit.service.ts`
+- `prisma/schema.prisma`
+- `prisma/migrations/<timestamp>_default_download_limit_one/migration.sql`
+- `src/commands/owner.command.ts`
+- `README.md`
+- `AGENT.md`
+
+### 4. Strategi Migrasi Database
+
+- Ubah default schema SQLite dari `3` menjadi `1`.
+- Migration hanya mengubah default untuk record baru.
+- Saldo limit user existing tidak dipaksa menjadi `1`, karena nilai tersebut bisa berasal dari daily reward, pembelian, atau transfer.
+- `.resetlimit @user` secara eksplisit mengubah saldo target menjadi `1`.
+
+### 5. Urutan Implementasi
+
+1. Ubah konstanta default limit pada dua service menjadi `1`.
+2. Ubah schema Prisma dan buat migration.
+3. Ubah teks owner menu dan dokumentasi.
+4. Jalankan Prisma validate, build, lint, dan smoke test.
+
+### 6. Acceptance Criteria
+
+- [x] User baru mendapat 1 limit.
+- [x] `.resetlimit @user` mengubah limit target menjadi 1.
+- [x] User lama mempertahankan saldo existing sampai memakai `.resetlimit`.
+- [x] Pembelian limit pertama kali memakai rumus `1 + jumlah pembelian`.
+- [x] Penerima transfer baru memakai rumus `1 + jumlah transfer`.
+- [x] Owner tetap unlimited.
+- [x] Prisma migration berhasil.
+- [x] TypeScript build berhasil.
+- [x] Fitur existing tidak rusak.
+
+### 7. Testing Checklist
+
+- [x] Jalankan `npx prisma validate`.
+- [x] Jalankan `npm run build`.
+- [x] Jalankan `npm run lint`.
+- [ ] Test `.limit` pada user baru.
+- [ ] Test `.resetlimit @user`.
+- [ ] Test `.belilimit 1` pada user tanpa record limit.
+- [ ] Test `.transferlimit @user 1` pada penerima tanpa record limit.
+- [ ] Test `.limit` pada owner.
+
+---
+
+## Tahap 47 - Command Quote Random (Selesai)
+
+### 1. Ringkasan Fitur
+
+Menambahkan command `.quote` untuk mengirim satu quote random kepada member grup tanpa cooldown.
+
+Command:
+
+```txt
+.quote
+.quote motivasi
+.quote lucu
+.quote islami
+.quote cinta
+.quote galau
+```
+
+Semua member boleh memakai command ini. Tidak diperlukan permission admin atau owner.
+
+### 2. Analisis Struktur Project Existing Hasil Scan
+
+Pola command existing:
+
+- `src/commands/downloadLimit.command.ts`
+  - Handler menerima `CommandContext`.
+  - Validasi konteks dilakukan di command.
+  - Balasan memakai `context.reply()`.
+  - Error dicatat melalui `logger.error()` lalu dilempar agar router menangani fallback.
+- `src/commands/daily.command.ts`
+  - Command tipis dan business logic dipisahkan ke service.
+- `src/commands/sticker.command.ts`
+  - Error operasional yang dapat dipahami user diberi balasan ramah.
+- `src/commands/index.ts`
+  - Semua command umum didaftarkan ke `commandHandlers`.
+- `src/commands/menu.command.ts`
+  - Menu dibangun sebagai array baris lalu digabungkan dengan `join('\n')`.
+
+Temuan file data:
+
+- File aktual di repository adalah `quotes.json`, bukan `/KOG-Bot/quote.json`.
+- Lokasi aktual repository lokal: `C:\laragon\www\KOGBot\quotes.json`.
+- Deploy VPS existing memakai `/var/www/KOGBot`, sehingga path runtime yang konsisten adalah `<project-root>/quotes.json`.
+- Kategori aktual: `motivasi`, `lucu`, `islami`, `cinta`, `galau`.
+- Item aktual berupa string, bukan objek `{ "text": "...", "author": "..." }`.
+
+Keputusan implementasi yang perlu disetujui:
+
+- Gunakan file existing `quotes.json` di root project agar deploy konsisten.
+- Pertahankan dukungan format string existing dengan fallback author `Anonim`.
+- Tambahkan dukungan format objek `{ text, author }` agar file dapat dikembangkan bertahap.
+
+### 3. File yang Akan Dibuat
+
+- `src/services/quote.service.ts`
+  - Membaca dan memvalidasi `quotes.json`.
+  - Memilih quote random.
+  - Menyimpan state anti-repeat per grup memakai `Map`.
+- `src/commands/quote.command.ts`
+  - Menangani argumen kategori dan format balasan WhatsApp.
+
+### 4. File yang Akan Diubah
+
+- `src/commands/index.ts`
+  - Daftarkan `.quote`.
+- `src/commands/menu.command.ts`
+  - Tambahkan kategori `QUOTE`.
+- `quotes.json`
+  - Data existing dapat tetap berupa string; author fallback menjadi `Anonim`.
+- `README.md`
+  - Dokumentasikan command quote dan testing manual.
+- `AGENT.md`
+  - Sinkronkan gambaran fitur bot.
+
+## #5. Alur Pengambilan Quote Random
+
+Flow `.quote`:
+
+1. Router meneruskan command ke `handleQuoteCommand`.
+2. Command membaca argumen kategori opsional.
+3. Service membaca `<project-root>/quotes.json`.
+4. Service memvalidasi struktur JSON dan memastikan ada quote yang dapat dipakai.
+5. Tanpa kategori, gabungkan quote dari semua kategori.
+6. Dengan kategori, gunakan array dari kategori tersebut.
+7. Pilih satu item random.
+8. Normalisasi item:
+   - String menjadi `{ text: item, author: "Anonim" }`.
+   - Objek memakai `text` dan `author`, dengan fallback author `Anonim`.
+9. Terapkan anti-repeat berdasarkan grup.
+10. Format balasan sesuai kategori.
+
+Output `.quote`:
+
+```txt
+💬 Quote of the Day
+
+"{text}"
+
+— {author}
+```
+
+Output `.quote <kategori>`:
+
+```txt
+💬 Quote {Kategori}
+
+"{text}"
+
+— {author}
+```
+
+### 6. Strategi Anti-Repeat di Memory
+
+Gunakan:
+
+```ts
+Map<string, string>
+```
+
+- Key: `groupJid`.
+- Value: identifier quote terakhir, misalnya gabungan kategori dan text.
+- Jika kumpulan kandidat memiliki lebih dari satu quote, jangan pilih identifier terakhir.
+- Jika hanya tersedia satu quote, kirim quote tersebut agar command tetap berfungsi.
+- State hilang saat bot restart. Ini sesuai kebutuhan karena history tidak perlu disimpan ke database.
+
+### 7. Penanganan Error File Tidak Ditemukan
+
+Jika `quotes.json` tidak ditemukan, JSON rusak, atau tidak memiliki quote valid:
+
+```txt
+Maaf, data quote sedang tidak tersedia.
+```
+
+Jika kategori tidak dikenali:
+
+```txt
+Kategori tidak tersedia.
+Kategori yang ada: motivasi, lucu, islami, cinta, galau
+```
+
+Error teknis dicatat melalui logger tanpa membocorkan detail filesystem ke chat WhatsApp.
+
+### 8. Urutan Implementasi
+
+1. Konfirmasi keputusan memakai file root `quotes.json` dan fallback author `Anonim`.
+2. Buat `quote.service.ts`.
+3. Buat `quote.command.ts`.
+4. Daftarkan `.quote` pada router.
+5. Tambahkan kategori `QUOTE` pada menu.
+6. Update dokumentasi.
+7. Jalankan build, lint, dan smoke test.
+
+### 9. Acceptance Criteria
+
+- [x] PLAN.md dibuat dan disetujui sebelum coding.
+- [x] `.quote` mengirim quote random dari semua kategori.
+- [x] `.quote motivasi` mengirim quote kategori motivasi.
+- [x] `.quote lucu` mengirim quote kategori lucu.
+- [x] `.quote islami` mengirim quote kategori islami.
+- [x] `.quote cinta` mengirim quote kategori cinta.
+- [x] `.quote galau` mengirim quote kategori galau.
+- [x] Kategori tidak dikenali menampilkan pesan error beserta daftar kategori.
+- [x] File tidak ditemukan, kosong, atau rusak menampilkan pesan ramah.
+- [x] Quote yang sama tidak muncul dua kali berturut-turut dalam satu grup jika alternatif tersedia.
+- [x] Anti-repeat tidak memakai database.
+- [x] Semua member dapat memakai `.quote`.
+- [x] Tidak ada cooldown.
+- [x] Menu diperbarui.
+- [x] TypeScript build berhasil.
+- [x] Fitur lama tidak rusak.
+
+### 10. Testing Checklist
+
+- [x] Jalankan `.quote` beberapa kali dalam grup yang sama.
+- [x] Pastikan dua quote berturut-turut tidak identik jika alternatif tersedia.
+- [x] Jalankan seluruh variasi kategori.
+- [x] Jalankan `.quote kategori-tidak-ada`.
+- [ ] Rename sementara `quotes.json`, lalu pastikan pesan error ramah.
+- [ ] Uji file JSON kosong atau tidak valid.
+- [x] Pastikan item string memakai author `Anonim`.
+- [ ] Pastikan item objek memakai author dari file.
+- [ ] Jalankan `.menu`.
+- [x] Jalankan `npm run build`.
+- [x] Jalankan `npm run lint`.
+- [ ] Jalankan smoke test fitur existing yang terdampak router dan menu.

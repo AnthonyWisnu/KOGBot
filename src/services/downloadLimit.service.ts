@@ -10,7 +10,7 @@ import {
   getWeeklyScore,
 } from './score.service.js';
 
-const defaultDownloadLimit = 3;
+const defaultDownloadLimit = 1;
 const pointsPerDownloadLimit = 10;
 const ownerDisplayLimit = 999;
 
