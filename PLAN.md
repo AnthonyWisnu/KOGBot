@@ -2113,3 +2113,253 @@ Error teknis dicatat melalui logger tanpa membocorkan detail filesystem ke chat 
 - [x] Jalankan `npm run build`.
 - [x] Jalankan `npm run lint`.
 - [ ] Jalankan smoke test fitur existing yang terdampak router dan menu.
+
+## Tahap 48 - Private Downloader Limit Global (Selesai)
+
+Membuat fondasi agar member dapat memakai downloader lewat chat pribadi bot.
+Limit private tidak memakai `groupJid` grup biasa, tetapi memakai scope global khusus agar data tidak bercampur dengan limit per grup.
+
+### Tujuan
+
+- `.tt`, `.ig`, dan `.igstory` dapat dipakai lewat chat pribadi.
+- Limit private berlaku global untuk user tersebut, bukan per grup.
+- Limit grup yang sudah ada tetap berjalan seperti sekarang.
+- Owner tetap unlimited.
+- Tidak merusak sistem poin, limit, dan downloader grup.
+
+### Keputusan Teknis
+
+Gunakan scope khusus:
+
+```txt
+PRIVATE
+```
+
+atau konstanta yang jelas di service, misalnya:
+
+```ts
+const privateDownloadGroupJid = 'PRIVATE';
+```
+
+Dengan cara ini schema `UserDownloadLimit` tidak perlu langsung diubah karena key existing tetap:
+
+```txt
+userJid + groupJid
+```
+
+Untuk chat pribadi:
+
+```txt
+userJid + PRIVATE
+```
+
+### File yang Akan Diubah
+
+- `src/services/downloadLimit.service.ts`
+  - Tambahkan helper untuk menentukan scope limit private.
+  - Pastikan read/add/reset/reserve bisa menerima scope private.
+- `src/commands/downloadLimit.command.ts`
+  - `.limit` bisa dipakai di chat pribadi.
+  - `.belilimit` bisa dipakai di chat pribadi dengan limit global.
+- `src/commands/downloader.command.ts`
+  - `.tt` dan `.ig` bisa reserve limit walaupun chat bukan grup.
+- `src/commands/instagramStory.command.ts`
+  - `.igstory` bisa reserve limit walaupun chat bukan grup.
+- `src/types/command.ts`
+  - Jika perlu, tambahkan helper/scope agar command tidak menebak manual.
+
+### Alur Limit Private
+
+1. User chat pribadi bot.
+2. User menjalankan `.limit`.
+3. Bot membaca `UserDownloadLimit` dengan:
+   - `userJid = senderJid`
+   - `groupJid = PRIVATE`
+4. User menjalankan `.belilimit 1`.
+5. Bot memotong 100 poin dari scope yang disepakati.
+6. Bot menambah limit pada scope `PRIVATE`.
+7. User menjalankan `.tt <link>` atau `.ig <link>`.
+8. Bot reserve 1 limit dari scope `PRIVATE`.
+9. Jika download gagal setelah reserve, limit direfund ke scope yang sama.
+
+### Catatan Poin
+
+Perlu diputuskan saat implementasi:
+
+- Opsi A: beli limit private memakai poin dari grup terakhir/utama tidak tersedia.
+- Opsi B: private downloader hanya memakai limit yang diberi owner/daily/transfer global.
+- Opsi C: tambahkan scope poin global juga.
+
+Pilihan paling aman untuk tahap ini:
+
+- `.limit` private menampilkan limit global.
+- `.tt`, `.ig`, `.igstory` private memakai limit global.
+- `.belilimit` private ditahan dulu jika belum ada sistem poin global.
+- Owner dapat memakai downloader private unlimited.
+
+Jika ingin `.belilimit` private benar-benar aktif untuk member, lanjutkan dengan Tahap 49.
+
+### Acceptance Criteria
+
+- [x] Ada konstanta/helper scope private download.
+- [x] `.limit` di chat pribadi menampilkan limit private/global user.
+- [x] Owner di chat pribadi tetap unlimited.
+- [x] `.tt` di chat pribadi memakai limit private.
+- [x] `.ig` di chat pribadi memakai limit private.
+- [x] `.igstory` di chat pribadi memakai limit private.
+- [x] Refund limit private berjalan jika download gagal setelah reserve.
+- [x] Limit grup tidak ikut berkurang saat download private.
+- [x] Limit private tidak ikut berkurang saat download grup.
+- [x] TypeScript build berhasil.
+
+## Tahap 49 - Beli dan Kelola Limit Private (Selesai)
+
+Melengkapi sistem agar member bisa membeli atau menerima limit untuk pemakaian chat pribadi.
+
+### Tujuan
+
+- Member bisa mendapat limit private secara jelas.
+- `.belilimit` di chat pribadi tidak hanya visual.
+- Owner bisa `.givelimit` ke user untuk private jika command dijalankan di chat pribadi atau mode khusus.
+
+### Opsi Implementasi
+
+#### Opsi 1 - Poin Global / Lintas Grup (Dipakai)
+
+Untuk pembelian limit private, bot menghitung total poin minggu berjalan dari semua grup user:
+
+```txt
+SUM WeeklyScore.score
+WHERE userJid = target
+AND weekStart = minggu berjalan
+AND groupJid != PRIVATE
+```
+
+Kelebihan:
+
+- `.belilimit` private bisa berjalan mandiri.
+- User dapat memakai poin dari grup mana saja tanpa memilih grup.
+
+Kekurangan:
+
+- Saat membeli limit private, poin dapat terpotong dari beberapa grup sekaligus.
+
+#### Opsi 2 - Limit Private Hanya dari Owner/Daily
+
+Tidak membuat poin global.
+
+Kelebihan:
+
+- Lebih sederhana.
+- Risiko bug lebih kecil.
+
+Kekurangan:
+
+- User tidak bisa beli limit private dari poin game grup.
+
+#### Opsi 3 - Beli Private dari Poin Grup Pilihan
+
+User harus memberi argumen grup atau bot memakai grup terakhir user.
+
+Kelebihan:
+
+- Poin game grup tetap berguna untuk private downloader.
+
+Kekurangan:
+
+- Butuh mapping user ke grup terakhir.
+- Rawan membingungkan user.
+
+### Implementasi
+
+- `.limit` private aktif.
+- Downloader private aktif.
+- `.belilimit` private memakai total poin minggu ini dari semua grup.
+- Owner dapat memberi limit private melalui command:
+
+```txt
+.givelimitprivate <nomor|@user> <jumlah>
+.resetlimitprivate <nomor|@user>
+```
+
+### File yang Akan Dibuat/Diubah
+
+- `src/services/downloadLimit.service.ts`
+  - Tambahkan API eksplisit untuk limit private jika dibutuhkan.
+- `src/commands/owner.command.ts`
+  - Tambah command owner untuk memberi/reset limit private.
+- `src/commands/downloadLimit.command.ts`
+  - Tentukan perilaku `.belilimit` di chat pribadi.
+- `README.md`
+  - Dokumentasi private downloader dan batasannya.
+- `AGENT.md`
+  - Sinkronkan aturan baru.
+
+### Acceptance Criteria
+
+- [x] Ada aturan jelas cara member mendapat limit private.
+- [x] Owner bisa memberi limit private.
+- [x] Owner bisa reset limit private.
+- [x] `.belilimit` private memakai total poin minggu ini dari semua grup.
+- [x] `.limit` private menampilkan angka yang sama dengan yang dipakai downloader private.
+- [x] `.tt` private gagal jika limit private 0.
+- [x] `.tt` private berhasil reserve jika limit private > 0.
+- [x] Tidak ada perubahan perilaku limit grup.
+- [x] TypeScript build dan lint berhasil.
+
+## Tahap 50 - Menu, Dokumentasi, dan Acceptance Test Private Downloader (Selesai)
+
+Finalisasi fitur downloader via chat pribadi setelah Tahap 48 dan 49 selesai.
+
+### Update Menu
+
+Tambahkan catatan ringkas:
+
+```txt
+Downloader juga bisa dipakai lewat chat pribadi bot jika user punya limit private.
+```
+
+Jika command private limit dibuat, tambahkan ke owner menu atau menu yang sesuai.
+
+### Dokumentasi
+
+Update:
+
+- `README.md`
+  - Cara pakai downloader di grup.
+  - Cara pakai downloader di chat pribadi.
+  - Perbedaan limit grup dan limit private.
+  - Cara owner memberi/reset limit private.
+- `AGENT.md`
+  - Ringkasan aturan private downloader.
+- `PLAN.md`
+  - Tandai tahap selesai setelah implementasi dan test.
+
+### Acceptance Test
+
+- [x] Menu menampilkan catatan downloader private.
+- [x] README menjelaskan cara pakai downloader private.
+- [x] README menjelaskan perbedaan limit grup dan limit private.
+- [x] README menjelaskan cara owner memberi/reset limit private.
+- [x] AGENT menjelaskan aturan private downloader.
+- [x] User tanpa limit private menjalankan reserve private dan ditolak.
+- [x] Owner memberi limit private ke user melalui service/command owner.
+- [x] User cek `.limit` private dan angka sama dengan yang dipakai downloader private.
+- [x] Reserve private mengurangi limit private.
+- [x] Reserve private tidak mengurangi limit grup.
+- [x] Reserve grup tidak mengurangi limit private.
+- [x] Owner download private tetap unlimited.
+- [x] `npm run build` berhasil.
+- [x] `npm run lint` berhasil.
+
+### Checklist WhatsApp Live
+
+- [ ] User tanpa limit private menjalankan `.tt <link>` di chat pribadi dan ditolak.
+- [ ] Owner memberi limit private ke user.
+- [ ] User cek `.limit` di chat pribadi dan angka benar.
+- [ ] User download TikTok via chat pribadi dan limit berkurang 1.
+- [ ] User download Instagram Reels via chat pribadi dan limit berkurang 1.
+- [ ] Jika download gagal setelah reserve, limit private kembali.
+- [ ] Download di grup tetap memakai limit grup.
+- [ ] Download di private tetap memakai limit private.
+- [ ] Owner download private tetap unlimited.

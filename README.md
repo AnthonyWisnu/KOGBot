@@ -180,6 +180,8 @@ pm2 restart kogbot
 - Konten private yang tidak dapat diakses akun cookie tidak didukung.
 - Setiap download sukses memakai 1 limit. Download gagal tidak mengurangi limit.
 - User biasa mendapat 1 limit default. `.resetlimit @user` mengembalikan limit target ke 1.
+- Downloader bisa dipakai di chat pribadi bot dengan limit private. `.belilimit` di chat pribadi memakai total poin minggu ini dari semua grup user.
+- Owner dapat memberi atau reset limit private dengan `.givelimitprivate <nomor|@user> <jumlah>` dan `.resetlimitprivate <nomor|@user>`.
 - Owner selalu tampil memiliki 999 poin dan 999 limit tanpa menyimpan nilai 999 permanen di database.
 - Identitas user disimpan sebagai `[nomor]@s.whatsapp.net`. Record lama berformat `@lid` digabungkan otomatis saat metadata grup tersedia.
 - Poin tidak direset otomatis. Reset poin hanya manual oleh owner dengan `.resetpoin` lalu `.confirmresetpoin`.
@@ -213,6 +215,19 @@ motivasi, lucu, islami, cinta, galau
 ```
 
 Data quote dibaca dari file `quotes.json` di root project. Item string otomatis memakai author `Anonim`.
+
+## Private Downloader
+
+Downloader dapat dipakai di grup atau chat pribadi bot.
+
+- Di grup, `.tt`, `.ig`, dan `.igstory` memakai limit grup.
+- Di chat pribadi, `.tt`, `.ig`, dan `.igstory` memakai limit private.
+- `.limit` di chat pribadi menampilkan limit private dan total poin minggu ini dari semua grup.
+- `.belilimit <jumlah>` di chat pribadi memakai total poin minggu ini dari semua grup user.
+- Harga beli limit adalah 100 poin untuk 1 limit.
+- Owner dapat menambah limit private dengan `.givelimitprivate <nomor|@user> <jumlah>`.
+- Owner dapat reset limit private dengan `.resetlimitprivate <nomor|@user>`.
+- Download gagal setelah reserve akan mengembalikan limit ke scope yang sama.
 
 ## Moderasi Grup
 
@@ -258,7 +273,7 @@ Jalankan setelah bot berhasil login dan masuk ke grup uji:
 14. Reply gambar dengan `.s`, lalu reply sticker dengan `.gambar`.
 15. Aktifkan `.welcome on`, lalu test member masuk dan keluar.
 16. Owner menjalankan `.resetpoin`, lalu `.confirmresetpoin` dalam 30 detik.
-17. Owner menjalankan `.givepoin @user 10`, `.givelimit @user 5`, dan `.resetlimit @user`.
+17. Owner menjalankan `.givepoin @user 10`, `.givelimit @user 5`, `.resetlimit @user`, `.givelimitprivate @user 5`, dan `.resetlimitprivate @user`.
 18. Jadikan bot admin grup, lalu test owner menjalankan `.kick @member`, `.promote @member`, dan `.demote @admin`.
 19. Test admin menjalankan `.kick @member` dan `.promote @member`. Pastikan admin ditolak saat mencoba `.kick @admin`, `.kick @owner`, atau `.demote @admin`.
 20. Test member biasa menjalankan `.kick`, `.promote`, `.demote`, `.tagall`, dan `.antilink on`. Pastikan semuanya ditolak.
@@ -268,5 +283,6 @@ Jalankan setelah bot berhasil login dan masuk ke grup uji:
 24. Jalankan `.tagall Pengumuman test`, lalu ulangi sebelum 10 menit. Pastikan pengiriman kedua ditolak oleh cooldown.
 25. Jalankan `.antilink on`, lalu kirim link `chat.whatsapp.com` memakai akun member. Pastikan pesan dihapus dan member dikeluarkan.
 26. Saat anti link aktif, kirim link TikTok, Instagram, YouTube, dan website biasa. Pastikan tidak ditindak.
-27. Jalankan `.antilink off`, lalu kirim link grup WhatsApp memakai member. Pastikan tidak ditindak.
-28. Cek `pm2 logs kogbot` dan pastikan tidak ada crash.
+27. Di chat pribadi bot, jalankan `.limit`, `.belilimit 1`, dan `.tt <link>`. Pastikan limit private berkurang tanpa mengurangi limit grup.
+28. Jalankan `.antilink off`, lalu kirim link grup WhatsApp memakai member. Pastikan tidak ditindak.
+29. Cek `pm2 logs kogbot` dan pastikan tidak ada crash.

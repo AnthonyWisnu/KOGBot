@@ -39,6 +39,7 @@ export async function handleMenuCommand(context: CommandContext): Promise<void> 
         `*${env.BOT_PREFIX}tt <link>* - Download TikTok`,
         `*${env.BOT_PREFIX}ig <link>* - Download Instagram Reels`,
         `*${env.BOT_PREFIX}igstory <link>* - Download Instagram Story`,
+        '_Chat pribadi bot memakai limit private._',
         '',
         '\u{1F5BC} *MEDIA*',
         `*${env.BOT_PREFIX}s* - Reply gambar jadi sticker`,

@@ -4,6 +4,7 @@ import {
   downloadTikTokVideo,
 } from '../services/downloader.service.js';
 import {
+  getDownloadLimitScope,
   refundReservedDownloadLimit,
   reserveDownloadLimit,
 } from '../services/downloadLimit.service.js';
@@ -18,6 +19,7 @@ import { removeTempFile } from '../utils/tempFile.js';
 export async function handleTikTokDownloadCommand(context: CommandContext): Promise<void> {
   let filePath: string | undefined;
   let reservedLimit = false;
+  const limitScope = getDownloadLimitScope(context);
 
   try {
     const url = context.command.args[0];
@@ -34,7 +36,7 @@ export async function handleTikTokDownloadCommand(context: CommandContext): Prom
 
     reservedLimit = await reserveDownloadLimit({
       userJid: context.senderJid,
-      groupJid: context.chatJid,
+      groupJid: limitScope,
     });
 
     if (!reservedLimit) {
@@ -66,7 +68,7 @@ export async function handleTikTokDownloadCommand(context: CommandContext): Prom
 
     await refundReservedDownloadLimit({
       userJid: context.senderJid,
-      groupJid: context.chatJid,
+      groupJid: limitScope,
       reserved: reservedLimit,
     });
 
@@ -96,6 +98,7 @@ export async function handleTikTokDownloadCommand(context: CommandContext): Prom
 export async function handleInstagramDownloadCommand(context: CommandContext): Promise<void> {
   let filePath: string | undefined;
   let reservedLimit = false;
+  const limitScope = getDownloadLimitScope(context);
 
   try {
     const url = context.command.args[0];
@@ -112,7 +115,7 @@ export async function handleInstagramDownloadCommand(context: CommandContext): P
 
     reservedLimit = await reserveDownloadLimit({
       userJid: context.senderJid,
-      groupJid: context.chatJid,
+      groupJid: limitScope,
     });
 
     if (!reservedLimit) {
@@ -144,7 +147,7 @@ export async function handleInstagramDownloadCommand(context: CommandContext): P
 
     await refundReservedDownloadLimit({
       userJid: context.senderJid,
-      groupJid: context.chatJid,
+      groupJid: limitScope,
       reserved: reservedLimit,
     });
 

@@ -4,11 +4,14 @@ import type { CommandContext } from '../types/command.js';
 import { addWeeklyScore } from '../services/score.service.js';
 import {
   addDownloadLimit,
+  privateDownloadLimitScope,
   resetDownloadLimit,
 } from '../services/downloadLimit.service.js';
 import { resolveFirstMentionedJid } from '../utils/mentions.js';
 import { logger } from '../utils/logger.js';
 import { resolveGroupUserDisplay } from '../utils/userDisplay.js';
+import { formatMention } from '../utils/format.js';
+import { normalizeJid } from '../utils/jid.js';
 import {
   handleConfirmResetPointCommand,
   handleResetPointCommand,
@@ -31,6 +34,8 @@ export const ownerCommandNames = new Set([
   'givepoin',
   'givelimit',
   'resetlimit',
+  'givelimitprivate',
+  'resetlimitprivate',
   'ownermenu',
 ]);
 
@@ -71,6 +76,12 @@ export async function handleOwnerCommand(context: CommandContext): Promise<void>
         return;
       case 'resetlimit':
         await handleResetLimit(context);
+        return;
+      case 'givelimitprivate':
+        await handleGivePrivateLimit(context);
+        return;
+      case 'resetlimitprivate':
+        await handleResetPrivateLimit(context);
         return;
       default:
         await context.reply(`Command owner tidak dikenal. Ketik ${env.BOT_PREFIX}ownermenu.`);
@@ -163,6 +174,8 @@ async function handleOwnerMenu(context: CommandContext): Promise<void> {
         `${env.BOT_PREFIX}givepoin @user jumlah  - Tambah poin user`,
         `${env.BOT_PREFIX}givelimit @user jumlah - Tambah limit user`,
         `${env.BOT_PREFIX}resetlimit @user       - Reset limit user ke 1`,
+        `${env.BOT_PREFIX}givelimitprivate target jumlah - Tambah limit private`,
+        `${env.BOT_PREFIX}resetlimitprivate target       - Reset limit private`,
       ].join('\n'),
     );
   } catch (error) {
@@ -285,6 +298,70 @@ async function handleResetLimit(context: CommandContext): Promise<void> {
   }
 }
 
+async function handleGivePrivateLimit(context: CommandContext): Promise<void> {
+  try {
+    const targetJid = await getOwnerPrivateTargetJid(context);
+
+    if (!targetJid) {
+      return;
+    }
+
+    const amount = parsePositiveInteger(context.command.args.at(-1));
+
+    if (!amount) {
+      await context.reply('Gunakan .givelimitprivate @user <jumlah> atau .givelimitprivate 628xxx <jumlah>.');
+      return;
+    }
+
+    const currentLimit = await addDownloadLimit({
+      userJid: targetJid,
+      groupJid: privateDownloadLimitScope,
+      amount,
+    });
+    const targetDisplay = await resolveOwnerTargetDisplay(context, targetJid);
+
+    await replyWithMentions(
+      context,
+      [
+        `Berhasil memberi ${amount} limit private ke ${targetDisplay.label}.`,
+        `Limit private user sekarang: ${currentLimit}`,
+      ].join('\n'),
+      [targetDisplay.userJid],
+    );
+  } catch (error) {
+    logger.error({ error, chatJid: context.chatJid }, 'Gagal menjalankan command givelimitprivate');
+    throw error;
+  }
+}
+
+async function handleResetPrivateLimit(context: CommandContext): Promise<void> {
+  try {
+    const targetJid = await getOwnerPrivateTargetJid(context);
+
+    if (!targetJid) {
+      return;
+    }
+
+    const currentLimit = await resetDownloadLimit({
+      userJid: targetJid,
+      groupJid: privateDownloadLimitScope,
+    });
+    const targetDisplay = await resolveOwnerTargetDisplay(context, targetJid);
+
+    await replyWithMentions(
+      context,
+      [
+        `Limit private ${targetDisplay.label} sudah direset.`,
+        `Limit private user sekarang: ${currentLimit}`,
+      ].join('\n'),
+      [targetDisplay.userJid],
+    );
+  } catch (error) {
+    logger.error({ error, chatJid: context.chatJid }, 'Gagal menjalankan command resetlimitprivate');
+    throw error;
+  }
+}
+
 async function replyWithMentions(
   context: CommandContext,
   text: string,
@@ -318,6 +395,64 @@ async function getOwnerTargetJid(context: CommandContext): Promise<string | unde
   }
 
   return targetJid;
+}
+
+async function getOwnerPrivateTargetJid(context: CommandContext): Promise<string | undefined> {
+  if (context.isGroup) {
+    const mentionedJid = await resolveFirstMentionedJid({
+      socket: context.socket,
+      groupJid: context.chatJid,
+      message: context.message.message,
+    });
+
+    if (mentionedJid) {
+      return mentionedJid;
+    }
+  }
+
+  const targetArg = context.command.args[0];
+  const targetJid = parseTargetJidArg(targetArg);
+
+  if (!targetJid) {
+    await context.reply('Target wajib diisi. Gunakan mention di grup atau nomor, contoh: .givelimitprivate 628xxx 3');
+    return undefined;
+  }
+
+  return targetJid;
+}
+
+async function resolveOwnerTargetDisplay(
+  context: CommandContext,
+  targetJid: string,
+): Promise<{ userJid: string; label: string }> {
+  const userJid = normalizeJid(targetJid);
+
+  if (!context.isGroup) {
+    return {
+      userJid,
+      label: formatMention(userJid),
+    };
+  }
+
+  return await resolveGroupUserDisplay({
+    socket: context.socket,
+    groupJid: context.chatJid,
+    userJid,
+  });
+}
+
+function parseTargetJidArg(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const number = value.replace(/\D/g, '');
+
+  if (!number) {
+    return undefined;
+  }
+
+  return normalizeJid(`${number}@s.whatsapp.net`);
 }
 
 function parsePositiveInteger(value: string | undefined): number | undefined {

@@ -1,4 +1,4 @@
-import type { UserDownloadLimit } from '@prisma/client';
+import type { Prisma, UserDownloadLimit } from '@prisma/client';
 
 import { prisma } from '../database/prisma.js';
 import { isOwner } from '../bot/permissions.js';
@@ -6,6 +6,7 @@ import { normalizeJid } from '../utils/jid.js';
 import { logger } from '../utils/logger.js';
 import {
   getDisplayWeeklyScore,
+  getTotalWeeklyScore,
   getWeekStartJakarta,
   getWeeklyScore,
 } from './score.service.js';
@@ -13,6 +14,7 @@ import {
 const defaultDownloadLimit = 1;
 const pointsPerDownloadLimit = 100;
 const ownerDisplayLimit = 999;
+export const privateDownloadLimitScope = 'PRIVATE';
 
 export type DownloadLimitStatus = {
   limit: number;
@@ -36,6 +38,17 @@ export type BuyDownloadLimitResult =
       currentPoints: number;
     };
 
+export function getDownloadLimitScope(params: {
+  chatJid: string;
+  isGroup: boolean;
+}): string {
+  return params.isGroup ? params.chatJid : privateDownloadLimitScope;
+}
+
+export function isPrivateDownloadLimitScope(groupJid: string): boolean {
+  return groupJid === privateDownloadLimitScope;
+}
+
 export async function getDownloadLimitStatus(params: {
   userJid: string;
   groupJid: string;
@@ -53,7 +66,12 @@ export async function getDownloadLimitStatus(params: {
 
     const [limit, points] = await Promise.all([
       getOrCreateDownloadLimit(normalizedParams),
-      getWeeklyScore(normalizedParams),
+      isPrivateDownloadLimitScope(params.groupJid)
+        ? getTotalWeeklyScore({
+            userJid,
+            excludeGroupJids: [privateDownloadLimitScope],
+          })
+        : getWeeklyScore(normalizedParams),
     ]);
 
     return {
@@ -82,7 +100,12 @@ export async function buyDownloadLimit(params: {
     }
 
     const requiredPoints = params.amount * pointsPerDownloadLimit;
-    const currentPoints = await getWeeklyScore(normalizedParams);
+    const currentPoints = isPrivateDownloadLimitScope(params.groupJid)
+      ? await getTotalWeeklyScore({
+          userJid,
+          excludeGroupJids: [privateDownloadLimitScope],
+        })
+      : await getWeeklyScore(normalizedParams);
 
     if (currentPoints < requiredPoints) {
       return {
@@ -94,21 +117,28 @@ export async function buyDownloadLimit(params: {
 
     const weekStart = getWeekStartJakarta(new Date());
     const currentLimit = await prisma.$transaction(async (transaction) => {
-      const spent = await transaction.weeklyScore.updateMany({
-        where: {
-          userJid,
-          groupJid: params.groupJid,
-          weekStart,
-          score: {
-            gte: requiredPoints,
-          },
-        },
-        data: {
-          score: {
-            decrement: requiredPoints,
-          },
-        },
-      });
+      const spent = isPrivateDownloadLimitScope(params.groupJid)
+        ? await spendPrivateWeeklyScores({
+            transaction,
+            userJid,
+            weekStart,
+            points: requiredPoints,
+          })
+        : await transaction.weeklyScore.updateMany({
+            where: {
+              userJid,
+              groupJid: params.groupJid,
+              weekStart,
+              score: {
+                gte: requiredPoints,
+              },
+            },
+            data: {
+              score: {
+                decrement: requiredPoints,
+              },
+            },
+          });
 
       if (spent.count === 0) {
         return undefined;
@@ -137,14 +167,26 @@ export async function buyDownloadLimit(params: {
     });
 
     if (currentLimit === undefined) {
+      const latestCurrentPoints = isPrivateDownloadLimitScope(params.groupJid)
+        ? await getTotalWeeklyScore({
+            userJid,
+            excludeGroupJids: [privateDownloadLimitScope],
+          })
+        : await getWeeklyScore(normalizedParams);
+
       return {
         status: 'insufficient_points',
         requiredPoints,
-        currentPoints: await getWeeklyScore(normalizedParams),
+        currentPoints: latestCurrentPoints,
       };
     }
 
-    const remainingPoints = await getWeeklyScore(normalizedParams);
+    const remainingPoints = isPrivateDownloadLimitScope(params.groupJid)
+      ? await getTotalWeeklyScore({
+          userJid,
+          excludeGroupJids: [privateDownloadLimitScope],
+        })
+      : await getWeeklyScore(normalizedParams);
 
     return {
       status: 'success',
@@ -273,6 +315,65 @@ export async function refundReservedDownloadLimit(params: {
   } catch (error) {
     logger.error({ error, params }, 'Gagal refund limit download yang sudah direserve');
   }
+}
+
+async function spendPrivateWeeklyScores(params: {
+  transaction: Prisma.TransactionClient;
+  userJid: string;
+  weekStart: Date;
+  points: number;
+}): Promise<{ count: number }> {
+  const scores = await params.transaction.weeklyScore.findMany({
+    where: {
+      userJid: params.userJid,
+      weekStart: params.weekStart,
+      groupJid: {
+        not: privateDownloadLimitScope,
+      },
+      score: {
+        gt: 0,
+      },
+    },
+    orderBy: [
+      {
+        updatedAt: 'asc',
+      },
+    ],
+    select: {
+      id: true,
+      score: true,
+    },
+  });
+  const totalScore = scores.reduce((total, score) => total + score.score, 0);
+
+  if (totalScore < params.points) {
+    return { count: 0 };
+  }
+
+  let remainingPoints = params.points;
+
+  for (const score of scores) {
+    if (remainingPoints <= 0) {
+      break;
+    }
+
+    const pointsToSpend = Math.min(score.score, remainingPoints);
+
+    await params.transaction.weeklyScore.update({
+      where: {
+        id: score.id,
+      },
+      data: {
+        score: {
+          decrement: pointsToSpend,
+        },
+      },
+    });
+
+    remainingPoints -= pointsToSpend;
+  }
+
+  return { count: 1 };
 }
 
 async function getOrCreateDownloadLimit(params: {

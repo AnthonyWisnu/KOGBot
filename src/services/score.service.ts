@@ -78,6 +78,36 @@ export async function getWeeklyScore(params: {
   }
 }
 
+export async function getTotalWeeklyScore(params: {
+  userJid: string;
+  now?: Date;
+  excludeGroupJids?: string[];
+}): Promise<number> {
+  try {
+    const userJid = normalizeJid(params.userJid);
+    const weekStart = getWeekStartJakarta(params.now ?? new Date());
+    const result = await prisma.weeklyScore.aggregate({
+      where: {
+        userJid,
+        weekStart,
+        groupJid: params.excludeGroupJids?.length
+          ? {
+              notIn: params.excludeGroupJids,
+            }
+          : undefined,
+      },
+      _sum: {
+        score: true,
+      },
+    });
+
+    return result._sum.score ?? 0;
+  } catch (error) {
+    logger.error({ error, params }, 'Gagal mengambil total poin mingguan');
+    throw error;
+  }
+}
+
 export async function getDisplayWeeklyScore(params: {
   userJid: string;
   groupJid: string;

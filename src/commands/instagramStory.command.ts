@@ -1,6 +1,7 @@
 import { env } from '../config/env.js';
 import { downloadInstagramStoryMedia } from '../services/downloader.service.js';
 import {
+  getDownloadLimitScope,
   refundReservedDownloadLimit,
   reserveDownloadLimit,
 } from '../services/downloadLimit.service.js';
@@ -12,6 +13,7 @@ import { removeTempFile } from '../utils/tempFile.js';
 export async function handleInstagramStoryDownloadCommand(context: CommandContext): Promise<void> {
   let filePath: string | undefined;
   let reservedLimit = false;
+  const limitScope = getDownloadLimitScope(context);
 
   try {
     const url = context.command.args[0];
@@ -28,7 +30,7 @@ export async function handleInstagramStoryDownloadCommand(context: CommandContex
 
     reservedLimit = await reserveDownloadLimit({
       userJid: context.senderJid,
-      groupJid: context.chatJid,
+      groupJid: limitScope,
     });
 
     if (!reservedLimit) {
@@ -64,7 +66,7 @@ export async function handleInstagramStoryDownloadCommand(context: CommandContex
 
     await refundReservedDownloadLimit({
       userJid: context.senderJid,
-      groupJid: context.chatJid,
+      groupJid: limitScope,
       reserved: reservedLimit,
     });
 

@@ -1,5 +1,6 @@
 import {
   buyDownloadLimit,
+  getDownloadLimitScope,
   getDownloadLimitStatus,
 } from '../services/downloadLimit.service.js';
 import type { CommandContext } from '../types/command.js';
@@ -8,20 +9,20 @@ import { logger } from '../utils/logger.js';
 
 export async function handleLimitCommand(context: CommandContext): Promise<void> {
   try {
-    if (!context.isGroup) {
-      await context.reply('Command ini hanya bisa digunakan di grup.');
-      return;
-    }
+    const limitScope = getDownloadLimitScope(context);
 
     const status = await getDownloadLimitStatus({
       userJid: context.senderJid,
-      groupJid: context.chatJid,
+      groupJid: limitScope,
     });
+    const scopeLabel = context.isGroup ? 'grup' : 'private';
 
     await context.reply(
       [
-        `Limit download kamu: ${status.limit}`,
-        `Poin kamu: ${status.points}`,
+        `Limit download ${scopeLabel} kamu: ${status.limit}`,
+        context.isGroup
+          ? `Poin kamu: ${status.points}`
+          : `Total poin minggu ini: ${status.points}`,
       ].join('\n'),
     );
   } catch (error) {
@@ -32,11 +33,6 @@ export async function handleLimitCommand(context: CommandContext): Promise<void>
 
 export async function handleBuyLimitCommand(context: CommandContext): Promise<void> {
   try {
-    if (!context.isGroup) {
-      await context.reply('Command ini hanya bisa digunakan di grup.');
-      return;
-    }
-
     if (isOwner(context.senderJid)) {
       await context.reply('Owner sudah memiliki limit unlimited.');
       return;
@@ -49,9 +45,10 @@ export async function handleBuyLimitCommand(context: CommandContext): Promise<vo
       return;
     }
 
+    const limitScope = getDownloadLimitScope(context);
     const result = await buyDownloadLimit({
       userJid: context.senderJid,
-      groupJid: context.chatJid,
+      groupJid: limitScope,
       amount,
     });
 
@@ -73,7 +70,7 @@ export async function handleBuyLimitCommand(context: CommandContext): Promise<vo
 
     await context.reply(
       [
-        `Berhasil membeli ${result.boughtLimit} limit download.`,
+        `Berhasil membeli ${result.boughtLimit} limit download ${context.isGroup ? 'grup' : 'private'}.`,
         `Poin terpakai: ${result.spentPoints}`,
         `Sisa poin: ${result.remainingPoints}`,
         `Limit sekarang: ${result.currentLimit}`,

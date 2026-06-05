@@ -601,7 +601,7 @@ Leaderboard Mingguan
 Aturan limit downloader:
 
 ```
-User baru              : 3 limit gratis per grup
+User baru              : 1 limit gratis per grup/private
 Download sukses        : -1 limit
 Download gagal         : limit tidak berkurang
 Beli limit             : 100 poin = 1 limit
@@ -610,6 +610,7 @@ Beli limit             : .belilimit <jumlah>
 Transfer limit         : .transferlimit @user <jumlah>
 Daily reward           : .daily, 1 kali per 24 jam
 Owner                  : tampil 999 poin dan 999 limit
+Private downloader     : memakai limit private
 ```
 
 Command owner:
@@ -618,6 +619,8 @@ Command owner:
 .givepoin @user <jumlah>
 .givelimit @user <jumlah>
 .resetlimit @user
+.givelimitprivate <nomor|@user> <jumlah>
+.resetlimitprivate <nomor|@user>
 ```
 
 Aturan owner tools:
@@ -625,7 +628,10 @@ Aturan owner tools:
 - `.givepoin` menambah poin target pada grup tempat command dijalankan.
 - `.givelimit` menambah limit download target pada grup tempat command dijalankan.
 - `.resetlimit` mengembalikan limit target ke default 1.
-- Ketiganya hanya boleh dijalankan owner.
+- `.givelimitprivate` menambah limit private target.
+- `.resetlimitprivate` mengembalikan limit private target ke default 1.
+- `.belilimit` di chat pribadi memakai total poin minggu ini dari semua grup user.
+- Command owner tersebut hanya boleh dijalankan owner.
 - Jika target adalah owner, poin dan limit tetap tampil 999 tanpa menyimpan angka 999 permanen.
 
 ---
@@ -641,6 +647,14 @@ Command:
 .ig <link>
 .igstory <link>
 ```
+
+Downloader bisa dipakai di grup dan chat pribadi bot:
+
+- Di grup, downloader memakai limit grup.
+- Di chat pribadi, downloader memakai limit private.
+- `.limit` di chat pribadi menampilkan limit private dan total poin minggu ini dari semua grup.
+- `.belilimit <jumlah>` di chat pribadi membeli limit private memakai total poin minggu ini dari semua grup.
+- Download gagal setelah reserve harus refund ke scope yang sama.
 
 Batasan:
 
