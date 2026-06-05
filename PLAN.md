@@ -823,7 +823,7 @@ Pekerjaan:
   - `.belilimit`
   - `.belilimit <jumlah>`
 - Aturan konversi:
-  - 10 poin = 1 limit download.
+  - 100 poin = 1 limit download.
 - Jika poin cukup, kurangi poin dan tambah limit.
 - Jika poin tidak cukup, balas pesan jelas.
 - Integrasikan limit ke downloader:
@@ -1862,7 +1862,7 @@ Acceptance criteria:
 
 Mengubah limit download awal dan nilai reset user biasa dari `3` menjadi `1`.
 
-Owner tetap unlimited dan tetap ditampilkan sebagai `999`. Harga pembelian limit tetap `10 poin = 1 limit`.
+Owner tetap unlimited dan tetap ditampilkan sebagai `999`. Harga pembelian limit menjadi `100 poin = 1 limit`.
 
 ### 2. Analisis Struktur Existing Hasil Scan
 

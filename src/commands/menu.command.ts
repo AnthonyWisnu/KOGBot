@@ -24,7 +24,7 @@ export async function handleMenuCommand(context: CommandContext): Promise<void> 
         `*${env.BOT_PREFIX}profile* / *@user* - Profil`,
         `*${env.BOT_PREFIX}rank* - Ranking grup`,
         `*${env.BOT_PREFIX}limit* - Cek limit download`,
-        `*${env.BOT_PREFIX}belilimit <jumlah>* - Beli limit`,
+        `*${env.BOT_PREFIX}belilimit <jumlah>* - Beli limit (100 poin/limit)`,
         `*${env.BOT_PREFIX}transferlimit @user <jumlah>* - Kirim limit`,
         '',
         '\u{1F381} *REWARD*',

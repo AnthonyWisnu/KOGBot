@@ -604,7 +604,7 @@ Aturan limit downloader:
 User baru              : 3 limit gratis per grup
 Download sukses        : -1 limit
 Download gagal         : limit tidak berkurang
-Beli limit             : 10 poin = 1 limit
+Beli limit             : 100 poin = 1 limit
 Cek limit              : .limit
 Beli limit             : .belilimit <jumlah>
 Transfer limit         : .transferlimit @user <jumlah>
@@ -1362,7 +1362,7 @@ Project dianggap selesai jika:
 27. Tidak ada reset poin otomatis mingguan.
 28. `.resetpoin` hanya owner dan membutuhkan `.confirmresetpoin`.
 29. `.limit` menampilkan limit download user.
-30. `.belilimit <jumlah>` membeli limit dengan konversi 10 poin = 1 limit.
+30. `.belilimit <jumlah>` membeli limit dengan konversi 100 poin = 1 limit.
 31. User baru mendapat 3 limit gratis per grup.
 32. Owner selalu tampil 999 poin dan 999 limit.
 33. `.profile` dan `.profile @user` menampilkan profil user.

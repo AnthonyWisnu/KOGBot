@@ -11,7 +11,7 @@ import {
 } from './score.service.js';
 
 const defaultDownloadLimit = 1;
-const pointsPerDownloadLimit = 10;
+const pointsPerDownloadLimit = 100;
 const ownerDisplayLimit = 999;
 
 export type DownloadLimitStatus = {
@@ -165,29 +165,72 @@ export async function reserveDownloadLimit(params: {
 }): Promise<boolean> {
   try {
     const userJid = normalizeJid(params.userJid);
-    const normalizedParams = { ...params, userJid };
 
     if (isOwner(userJid)) {
       return true;
     }
 
-    await getOrCreateDownloadLimit(normalizedParams);
-    const result = await prisma.userDownloadLimit.updateMany({
-      where: {
-        userJid,
-        groupJid: params.groupJid,
-        limit: {
-          gt: 0,
+    const result = await prisma.$transaction(async (transaction) => {
+      const current = await transaction.userDownloadLimit.upsert({
+        where: {
+          userJid_groupJid: {
+            userJid,
+            groupJid: params.groupJid,
+          },
         },
-      },
-      data: {
-        limit: {
-          decrement: 1,
+        create: {
+          userJid,
+          groupJid: params.groupJid,
+          limit: defaultDownloadLimit,
         },
-      },
+        update: {},
+        select: {
+          limit: true,
+        },
+      });
+
+      if (current.limit <= 0) {
+        return {
+          reserved: false,
+          currentLimit: current.limit,
+        };
+      }
+
+      const updated = await transaction.userDownloadLimit.update({
+        where: {
+          userJid_groupJid: {
+            userJid,
+            groupJid: params.groupJid,
+          },
+        },
+        data: {
+          limit: {
+            decrement: 1,
+          },
+        },
+        select: {
+          limit: true,
+        },
+      });
+
+      return {
+        reserved: true,
+        currentLimit: updated.limit,
+      };
     });
 
-    return result.count > 0;
+    if (!result.reserved) {
+      logger.warn(
+        {
+          userJid,
+          groupJid: params.groupJid,
+          currentLimit: result.currentLimit,
+        },
+        'Reserve limit download ditolak karena limit terbaca habis',
+      );
+    }
+
+    return result.reserved;
   } catch (error) {
     logger.error({ error, params }, 'Gagal memakai limit download');
     throw error;
