@@ -49,6 +49,7 @@ export async function handleInstagramStoryDownloadCommand(context: CommandContex
         }
       : {
           video: { url: result.filePath },
+          mimetype: 'video/mp4',
           caption: result.title ? `Instagram Story: ${result.title}` : undefined,
         };
 
@@ -85,6 +86,11 @@ export async function handleInstagramStoryDownloadCommand(context: CommandContex
       return;
     }
 
+    if (isFfmpegMissingError(error)) {
+      await context.reply('Downloader belum siap. ffmpeg belum terinstall di server.');
+      return;
+    }
+
     await context.reply('Gagal download Instagram Story. Story mungkin sudah expired atau tidak dapat diakses akun cookie.');
   } finally {
     if (filePath) {
@@ -106,6 +112,10 @@ function isFileTooLargeError(error: unknown): boolean {
 
 function isYtDlpMissingError(error: unknown): boolean {
   return error instanceof Error && error.message === 'yt-dlp belum terinstall';
+}
+
+function isFfmpegMissingError(error: unknown): boolean {
+  return error instanceof Error && error.message === 'ffmpeg belum terinstall';
 }
 
 function getErrorMessage(error: unknown): string | undefined {

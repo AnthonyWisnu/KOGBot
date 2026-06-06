@@ -55,6 +55,7 @@ export async function handleTikTokDownloadCommand(context: CommandContext): Prom
         video: {
           url: result.filePath,
         },
+        mimetype: 'video/mp4',
         caption: result.title ? `TikTok: ${result.title}` : undefined,
       },
       { quoted: context.message },
@@ -79,6 +80,11 @@ export async function handleTikTokDownloadCommand(context: CommandContext): Prom
 
     if (isYtDlpMissingError(error)) {
       await context.reply('Downloader belum siap. yt-dlp belum terinstall di server.');
+      return;
+    }
+
+    if (isFfmpegMissingError(error)) {
+      await context.reply('Downloader belum siap. ffmpeg belum terinstall di server.');
       return;
     }
 
@@ -134,6 +140,7 @@ export async function handleInstagramDownloadCommand(context: CommandContext): P
         video: {
           url: result.filePath,
         },
+        mimetype: 'video/mp4',
         caption: result.title ? `Instagram: ${result.title}` : undefined,
       },
       { quoted: context.message },
@@ -161,6 +168,11 @@ export async function handleInstagramDownloadCommand(context: CommandContext): P
       return;
     }
 
+    if (isFfmpegMissingError(error)) {
+      await context.reply('Downloader belum siap. ffmpeg belum terinstall di server.');
+      return;
+    }
+
     if (isNotPublicVideoError(error)) {
       await context.reply('Gagal download. Video tidak publik atau butuh login.');
       return;
@@ -180,6 +192,10 @@ function isFileTooLargeError(error: unknown): boolean {
 
 function isYtDlpMissingError(error: unknown): boolean {
   return error instanceof Error && error.message === 'yt-dlp belum terinstall';
+}
+
+function isFfmpegMissingError(error: unknown): boolean {
+  return error instanceof Error && error.message === 'ffmpeg belum terinstall';
 }
 
 function isNotPublicVideoError(error: unknown): boolean {

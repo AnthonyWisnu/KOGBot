@@ -10,6 +10,7 @@ import {
   createTempFilePath,
   removeTempFile,
 } from '../utils/tempFile.js';
+import { normalizeVideoForWhatsApp } from './videoNormalize.service.js';
 import {
   assertInstagramReelUrl,
   assertInstagramStoryUrl,
@@ -19,6 +20,8 @@ import { logger } from '../utils/logger.js';
 
 const bytesPerMb = 1024 * 1024;
 const requestTimeoutMs = 30000;
+const iosSafeYtDlpFormat = 'bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4][vcodec^=avc1]/best';
+const fallbackYtDlpFormat = 'best';
 
 type DownloadedVideo = {
   filePath: string;
@@ -45,17 +48,17 @@ export async function downloadTikTokVideo(url: string): Promise<DownloadedVideo>
     assertTikTokUrl(url);
 
     const tikwmResult = await downloadTikTokWithTikwm(url).catch((error: unknown) => {
-      logger.warn({ error, url }, 'TikWM gagal, mencoba yt-dlp untuk TikTok');
+      logger.warn({ error, hostname: getUrlHostname(url) }, 'TikWM gagal, mencoba yt-dlp untuk TikTok');
       return undefined;
     });
 
     if (tikwmResult) {
-      return tikwmResult;
+      return await normalizeDownloadedVideo(tikwmResult, 'tiktok');
     }
 
-    return await downloadWithYtDlp(url);
+    return await normalizeDownloadedVideo(await downloadWithYtDlp(url), 'tiktok');
   } catch (error) {
-    logger.error({ error, url }, 'Gagal download video TikTok');
+    logger.error({ error, hostname: getUrlHostname(url) }, 'Gagal download video TikTok');
     throw error;
   }
 }
@@ -64,9 +67,9 @@ export async function downloadInstagramReelVideo(url: string): Promise<Downloade
   try {
     assertInstagramReelUrl(url);
 
-    return await downloadWithYtDlp(url);
+    return await normalizeDownloadedVideo(await downloadWithYtDlp(url), 'instagram');
   } catch (error) {
-    logger.error({ error, url }, 'Gagal download video Instagram');
+    logger.error({ error, hostname: getUrlHostname(url) }, 'Gagal download video Instagram');
     throw error;
   }
 }
@@ -78,12 +81,19 @@ export async function downloadInstagramStoryMedia(url: string): Promise<Download
 
     const result = await downloadWithYtDlp(url);
 
+    if (isImageFile(result.filePath)) {
+      return {
+        ...result,
+        mediaType: 'image',
+      };
+    }
+
     return {
-      ...result,
-      mediaType: isImageFile(result.filePath) ? 'image' : 'video',
+      ...await normalizeDownloadedVideo(result, 'instagram story'),
+      mediaType: 'video',
     };
   } catch (error) {
-    logger.error({ error, url }, 'Gagal download Instagram Story');
+    logger.error({ error, hostname: getUrlHostname(url) }, 'Gagal download Instagram Story');
     throw error;
   }
 }
@@ -160,6 +170,15 @@ async function downloadWithYtDlp(url: string): Promise<DownloadedVideo> {
     const result = await runYtDlp({
       url,
       outputTemplate,
+      format: iosSafeYtDlpFormat,
+    }).catch(async (error: unknown) => {
+      logger.warn({ error }, 'yt-dlp format iOS-safe gagal, mencoba fallback best');
+
+      return await runYtDlp({
+        url,
+        outputTemplate,
+        format: fallbackYtDlpFormat,
+      });
     });
     filePath = result.filePath ?? await findDownloadedFile(outputTemplate);
 
@@ -178,6 +197,44 @@ async function downloadWithYtDlp(url: string): Promise<DownloadedVideo> {
       await removeTempFile(filePath);
     }
 
+    throw error;
+  }
+}
+
+async function normalizeDownloadedVideo(
+  video: DownloadedVideo,
+  source: string,
+): Promise<DownloadedVideo> {
+  let normalizedFilePath: string | undefined;
+
+  try {
+    const originalStats = await stat(video.filePath);
+    normalizedFilePath = await normalizeVideoForWhatsApp(video.filePath);
+    const normalizedStats = await stat(normalizedFilePath);
+
+    logger.info(
+      {
+        source,
+        originalFilePath: video.filePath,
+        normalizedFilePath,
+        originalSize: originalStats.size,
+        normalizedSize: normalizedStats.size,
+      },
+      'Video downloader berhasil dinormalisasi untuk WhatsApp',
+    );
+
+    await removeTempFile(video.filePath);
+
+    return {
+      ...video,
+      filePath: normalizedFilePath,
+    };
+  } catch (error) {
+    if (normalizedFilePath) {
+      await removeTempFile(normalizedFilePath);
+    }
+
+    await removeTempFile(video.filePath);
     throw error;
   }
 }
@@ -208,6 +265,7 @@ class SizeLimitTransform extends Transform {
 function runYtDlp(params: {
   url: string;
   outputTemplate: string;
+  format: string;
 }): Promise<{ filePath?: string; title?: string }> {
   return new Promise((resolve, reject) => {
     const args = [
@@ -221,7 +279,7 @@ function runYtDlp(params: {
       '--recode-video',
       'mp4',
       '-f',
-      'bv*+ba/best',
+      params.format,
       '--user-agent',
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36',
       '--print',
@@ -313,6 +371,14 @@ async function assertInstagramCookiesAvailable(): Promise<void> {
 
 function isImageFile(filePath: string): boolean {
   return /\.(jpe?g|png|webp)$/i.test(filePath);
+}
+
+function getUrlHostname(url: string): string | undefined {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return undefined;
+  }
 }
 
 function normalizeYtDlpError(error: Error): Error {

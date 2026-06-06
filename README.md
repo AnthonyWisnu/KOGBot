@@ -18,6 +18,7 @@ KOGBot adalah project bot WhatsApp berbasis Node.js dan TypeScript untuk grup pr
 - Downloader TikTok publik via `yt-dlp`
 - Downloader Instagram Reels publik via `yt-dlp`
 - Downloader satu Instagram Story spesifik via `yt-dlp` dan cookie akun sah
+- Normalisasi video downloader ke MP4 H.264/AAC agar aman untuk WhatsApp iOS dan Android
 - Gambar jadi sticker dengan reply `.s`
 - Sticker jadi gambar dengan reply `.gambar`
 - Limit downloader per user per grup
@@ -178,6 +179,7 @@ pm2 restart kogbot
 - Instagram Story hanya diproses melalui `.igstory <link>` untuk satu URL story spesifik yang dapat diakses akun cookie secara sah.
 - Simpan cookie Instagram di VPS sebagai `cookies.txt`, aktifkan `YTDLP_COOKIES_FILE=./cookies.txt`, dan jangan commit file tersebut.
 - Konten private yang tidak dapat diakses akun cookie tidak didukung.
+- Video downloader dinormalisasi dengan `ffmpeg` sebelum dikirim. Jika `ffmpeg` tidak tersedia, bot akan membalas bahwa downloader belum siap.
 - Setiap download sukses memakai 1 limit. Download gagal tidak mengurangi limit.
 - User biasa mendapat 1 limit default. `.resetlimit @user` mengembalikan limit target ke 1.
 - Downloader bisa dipakai di chat pribadi bot dengan limit private. `.belilimit` di chat pribadi memakai total poin minggu ini dari semua grup user.
