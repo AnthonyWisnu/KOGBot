@@ -172,7 +172,11 @@ async function downloadWithYtDlp(url: string): Promise<DownloadedVideo> {
       outputTemplate,
       format: iosSafeYtDlpFormat,
     }).catch(async (error: unknown) => {
-      logger.warn({ error }, 'yt-dlp format iOS-safe gagal, mencoba fallback best');
+      if (!isFormatUnavailableError(error)) {
+        throw error;
+      }
+
+      logger.warn({ error, hostname: getUrlHostname(url) }, 'yt-dlp format iOS-safe tidak tersedia, mencoba fallback best');
 
       return await runYtDlp({
         url,
@@ -275,8 +279,6 @@ function runYtDlp(params: {
       '--max-filesize',
       `${env.MAX_DOWNLOAD_MB}M`,
       '--merge-output-format',
-      'mp4',
-      '--recode-video',
       'mp4',
       '-f',
       params.format,
@@ -403,4 +405,19 @@ function createYtDlpExitError(stderr: string, code: number | null): Error {
   const message = stderr || `yt-dlp gagal dengan exit code ${code ?? 'unknown'}`;
 
   return new Error(`yt-dlp gagal: ${message.slice(0, 500)}`);
+}
+
+function isFormatUnavailableError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+
+  return (
+    message.includes('requested format is not available') ||
+    message.includes('no video formats found') ||
+    message.includes('no suitable formats') ||
+    message.includes('format is not available')
+  );
 }
