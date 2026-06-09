@@ -2,7 +2,7 @@
 
 ## 1. Project Overview
 
-KOGBot adalah project bot WhatsApp berbasis Node.js untuk grup pribadi kecil. Nama bot runtime saat ini adalah MinjiBot. Bot ini dipakai untuk hiburan grup, terutama game chat, sistem poin per grup, limit downloader, downloader video publik, welcome message otomatis, dan pesan perpisahan member keluar.
+KOGBot adalah project bot WhatsApp berbasis Node.js untuk grup pribadi kecil. Nama bot runtime saat ini adalah MinjiBot. Bot ini dipakai untuk hiburan grup, terutama game chat, sistem poin per grup, limit fitur berat, downloader video publik, welcome message otomatis, dan pesan perpisahan member keluar.
 
 Bot ini menggunakan nomor WhatsApp second khusus bot, bukan nomor pribadi. Bot hanya boleh aktif di grup yang sudah diizinkan oleh owner.
 
@@ -20,7 +20,7 @@ Bangun WhatsApp bot yang stabil, modular, dan mudah dikembangkan dengan fitur ut
 - Tebak Angka
 - Tic Tac Toe
 - Sistem poin per grup
-- Sistem limit downloader
+- Sistem limit fitur berat
 - Owner unlimited poin dan limit
 - Profile user
 - Daily reward
@@ -29,6 +29,8 @@ Bangun WhatsApp bot yang stabil, modular, dan mudah dikembangkan dengan fitur ut
 - Download TikTok publik tanpa watermark
 - Download Instagram Reels publik
 - Download satu Instagram Story berdasarkan URL spesifik
+- HD foto cepat 2x dengan `.hd` dan `.hd doc`
+- HD AI foto 4x dengan `.hdai` dan `.hdai doc`
 - Welcome member baru
 - Pesan perpisahan member keluar
 - Whitelist grup
@@ -60,6 +62,8 @@ Fitur yang tidak dibuat di versi awal:
 - dotenv untuk environment variable
 - pino untuk logging
 - yt-dlp dan ffmpeg untuk downloader TikTok dan Instagram Reels
+- sharp untuk HD foto cepat
+- Real-ESRGAN atau binary AI upscale lain untuk HD AI foto
 - zod untuk validasi input bila diperlukan
 
 Jangan gunakan Supabase pada versi awal. Untuk satu grup kecil, SQLite lebih ringan dan cukup.
@@ -598,19 +602,19 @@ Leaderboard Mingguan
 3. @user3 - 90 poin
 ```
 
-Aturan limit downloader:
+Aturan limit fitur:
 
 ```
 User baru              : 1 limit gratis per grup/private
-Download sukses        : -1 limit
-Download gagal         : limit tidak berkurang
+Fitur berat sukses     : -1 limit
+Fitur gagal            : limit tidak berkurang
 Beli limit             : 100 poin = 1 limit
 Cek limit              : .limit
 Beli limit             : .belilimit <jumlah>
 Transfer limit         : .transferlimit @user <jumlah>
 Daily reward           : .daily, 1 kali per 24 jam
 Owner                  : tampil 999 poin dan 999 limit
-Private downloader     : memakai limit private
+Private fitur berat    : memakai limit private
 ```
 
 Command owner:
@@ -626,7 +630,7 @@ Command owner:
 Aturan owner tools:
 
 - `.givepoin` menambah poin target pada grup tempat command dijalankan.
-- `.givelimit` menambah limit download target pada grup tempat command dijalankan.
+- `.givelimit` menambah limit fitur target pada grup tempat command dijalankan.
 - `.resetlimit` mengembalikan limit target ke default 1.
 - `.givelimitprivate` menambah limit private target.
 - `.resetlimitprivate` mengembalikan limit private target ke default 1.
@@ -809,6 +813,10 @@ _Kategori: motivasi, lucu, islami, cinta, galau_
 🖼 *MEDIA*
 *.s* - Reply gambar jadi sticker
 *.gambar* - Reply sticker jadi gambar
+*.hd* - Tingkatkan kualitas foto 2x
+*.hd doc* - HD foto sebagai dokumen
+*.hdai* - HD AI foto 4x
+*.hdai doc* - HD AI foto sebagai dokumen
 
 👋 *ADMIN*
 *.welcome on/off* - Atur welcome
@@ -823,7 +831,7 @@ _Kategori: motivasi, lucu, islami, cinta, galau_
 *.antilink on/off* - Anti link grup WhatsApp
 
 _Prefix: ._
-_Setiap download memakai 1 limit._
+_Limit fitur dipakai untuk download video dan HD AI._
 ```
 
 Menu owner terpisah:
@@ -1120,6 +1128,8 @@ TEMP_DIR=./temp
 MAX_DOWNLOAD_MB=50
 YTDLP_BINARY=yt-dlp
 # YTDLP_COOKIES_FILE=./cookies.txt
+HDAI_BINARY=real-esrgan-ncnn-vulkan
+HDAI_TIMEOUT_MS=180000
 TIMEZONE=Asia/Jakarta
 ```
 

@@ -19,10 +19,11 @@ export async function handleLimitCommand(context: CommandContext): Promise<void>
 
     await context.reply(
       [
-        `Limit download ${scopeLabel} kamu: ${status.limit}`,
+        `Limit fitur ${scopeLabel} kamu: ${status.limit}`,
         context.isGroup
           ? `Poin kamu: ${status.points}`
           : `Total poin minggu ini: ${status.points}`,
+        'Limit ini bisa digunakan untuk download video dan HD AI.',
       ].join('\n'),
     );
   } catch (error) {
@@ -70,7 +71,7 @@ export async function handleBuyLimitCommand(context: CommandContext): Promise<vo
 
     await context.reply(
       [
-        `Berhasil membeli ${result.boughtLimit} limit download ${context.isGroup ? 'grup' : 'private'}.`,
+        `Berhasil membeli ${result.boughtLimit} limit fitur ${context.isGroup ? 'grup' : 'private'}.`,
         `Poin terpakai: ${result.spentPoints}`,
         `Sisa poin: ${result.remainingPoints}`,
         `Limit sekarang: ${result.currentLimit}`,

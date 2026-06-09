@@ -47,6 +47,8 @@ import {
   handleStickerCommand,
   handleStickerToImageCommand,
 } from './sticker.command.js';
+import { handleHdCommand } from './hd.command.js';
+import { handleHdAiCommand } from './hdAi.command.js';
 import {
   handleBuyLimitCommand,
   handleLimitCommand,
@@ -96,6 +98,8 @@ const commandHandlers = new Map<string, CommandHandler>([
   ['igstory', handleInstagramStoryDownloadCommand],
   ['s', handleStickerCommand],
   ['gambar', handleStickerToImageCommand],
+  ['hd', handleHdCommand],
+  ['hdai', handleHdAiCommand],
 ]);
 
 export async function routeCommand(context: CommandContext): Promise<void> {

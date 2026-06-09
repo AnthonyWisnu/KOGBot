@@ -2363,3 +2363,287 @@ Update:
 - [ ] Download di grup tetap memakai limit grup.
 - [ ] Download di private tetap memakai limit private.
 - [ ] Owner download private tetap unlimited.
+
+## Tahap 51 - Fondasi HD Foto dan Limit Fitur (Selesai)
+
+Menyiapkan pondasi fitur HD Foto dan HD AI Foto dari `Fiturbaru.md` tanpa langsung menggabungkan semua kompleksitas dalam satu tahap.
+
+### Ringkasan Fitur
+
+- `.hd` untuk enhance foto cepat 2x.
+- `.hd doc` untuk enhance foto cepat 2x dan kirim sebagai document.
+- `.hdai` untuk AI upscale foto 4x memakai 1 limit fitur.
+- `.hdai doc` untuk AI upscale foto 4x dan kirim sebagai document.
+- Limit existing berubah makna menjadi limit fitur berat.
+- Fitur berat:
+  - `.tt`
+  - `.ig`
+  - `.igstory`
+  - `.hdai`
+  - `.hdai doc`
+
+### Keputusan Teknis
+
+- Tidak membuat tabel limit baru.
+- Tetap memakai service limit existing:
+  - `getDownloadLimitScope`
+  - `reserveDownloadLimit`
+  - `refundReservedDownloadLimit`
+- `.hd` dan `.hd doc` tidak memakai limit.
+- `.hdai` dan `.hdai doc` wajib memakai 1 limit.
+- Maksimal input foto 7 MB.
+- Output default berupa image.
+- Mode `doc` mengirim document untuk menjaga kualitas.
+- Semua pesan user-facing Bahasa Indonesia.
+- Tidak memakai emoji baru.
+
+### File yang Akan Dibuat
+
+- `src/utils/mediaTarget.ts`
+  - Deteksi foto dari quoted/reply message.
+  - Deteksi foto dari current image message dengan caption command.
+  - Validasi image saja.
+- `src/services/hd/cooldown.service.ts` atau helper kecil sejenis
+  - Cooldown in-memory untuk `.hd` dan `.hdai`.
+- `src/services/hd/hdAccess.service.ts`
+  - Placeholder `canUseHdAi(context)` untuk owner/premium/limit future.
+
+### File yang Akan Diubah
+
+- `src/commands/index.ts`
+  - Nanti register `.hd` dan `.hdai`.
+- `src/commands/menu.command.ts`
+  - Nanti tambah menu media HD.
+- `src/commands/downloadLimit.command.ts`
+  - Update wording dari limit download menjadi limit fitur.
+- `README.md`
+  - Dokumentasi dependency, command, batasan.
+- `AGENT.md`
+  - Sinkronkan aturan limit fitur.
+
+### Acceptance Criteria
+
+- [x] Ada helper media target reusable.
+- [x] Helper bisa membaca image dari reply.
+- [x] Helper bisa membaca image dari caption current message.
+- [x] Helper menolak video, sticker, document, dan audio.
+- [x] Helper membaca ukuran media untuk validasi 7 MB.
+- [x] Ada konstanta batas ukuran 7 MB.
+- [x] Ada helper cooldown in-memory.
+- [x] Ada placeholder `canUseHdAi`.
+- [x] `.limit` wording menjadi limit fitur.
+- [x] Build dan lint berhasil.
+
+## Tahap 52 - Command `.hd` dan `.hd doc` (Selesai)
+
+Implementasi fitur enhance cepat dan ringan memakai `sharp`.
+
+### Dependency
+
+- Tambahkan dependency `sharp`.
+- Jika install gagal di VPS, dokumentasikan cara install ulang dependency native.
+
+### Alur `.hd`
+
+1. User reply foto lalu kirim `.hd`, atau kirim foto dengan caption `.hd`.
+2. Bot validasi target media.
+3. Bot validasi ukuran maksimal 7 MB.
+4. Bot cek cooldown ringan per user, sekitar 15 sampai 30 detik.
+5. Bot download image ke buffer atau temp file.
+6. Service image enhance:
+   - auto orient dengan `rotate()`.
+   - resize 2x.
+   - batas sisi terpanjang maksimal sekitar 4096 sampai 5000 px.
+   - sharpen ringan.
+   - output JPEG quality 90 sampai 95.
+   - alpha/transparency dibuat aman dengan background putih jika output JPEG.
+7. `.hd` kirim sebagai image/jpeg.
+8. `.hd doc` kirim sebagai document:
+   - filename `hd-photo.jpg`.
+   - mimetype `image/jpeg`.
+9. Bersihkan temp/buffer.
+
+### File yang Akan Dibuat
+
+- `src/commands/hd.command.ts`
+- `src/services/hd/imageEnhance.service.ts`
+
+### Acceptance Criteria
+
+- [x] Reply foto lalu `.hd` berhasil melalui media target quoted.
+- [x] Kirim foto caption `.hd` berhasil melalui media target current.
+- [x] Reply foto lalu `.hd doc` berhasil melalui mode document.
+- [x] Kirim foto caption `.hd doc` berhasil melalui mode document.
+- [x] Input di atas 7 MB ditolak.
+- [x] Media selain foto ditolak.
+- [x] Output `.hd` dikirim sebagai image.
+- [x] Output `.hd doc` dikirim sebagai document.
+- [x] `.hd` tidak mengurangi limit fitur.
+- [x] Rotasi/orientasi tetap benar via `sharp.rotate()`.
+- [x] Cooldown `.hd` bekerja.
+- [x] Owner bypass cooldown jika pola permission mendukung.
+- [x] Temp file tidak menumpuk karena proses memakai buffer.
+- [x] Build dan lint berhasil.
+
+## Tahap 53 - Service HD AI dan Queue (Selesai)
+
+Menyiapkan AI upscale 4x dengan queue dan guard dependency eksternal.
+
+### Teknologi
+
+- Gunakan Real-ESRGAN atau engine AI upscale gratis berbasis CLI jika tersedia.
+- Bot tidak boleh crash jika binary AI tidak ada.
+- Jika dependency belum siap, balas:
+
+```txt
+Fitur HD AI belum siap di server.
+```
+
+### Queue
+
+- Queue in-memory.
+- Concurrency maksimal 1 job.
+- Pending maksimal 5 job.
+- Jika ada antrean, balas:
+
+```txt
+Permintaan HD AI sedang antre.
+Posisi antrean kamu: <n>
+```
+
+- Jika queue penuh, balas:
+
+```txt
+Antrean HD AI sedang penuh. Coba lagi nanti.
+```
+
+### File yang Akan Dibuat
+
+- `src/services/hd/imageAiUpscale.service.ts`
+- `src/services/hd/hdQueue.service.ts`
+
+### Acceptance Criteria
+
+- [x] Ada service AI upscale dengan guard dependency.
+- [x] Jika binary AI tidak ada, service throw error terkontrol.
+- [x] Ada queue in-memory concurrency 1.
+- [x] Queue memberi posisi antrean.
+- [x] Queue menolak request saat pending lebih dari batas.
+- [x] Job AI punya timeout aman.
+- [x] Temp input/output dibersihkan.
+- [x] Build dan lint berhasil.
+
+## Tahap 54 - Command `.hdai` dan Integrasi Limit Fitur (Selesai)
+
+Implementasi command `.hdai` dan `.hdai doc` dengan limit fitur existing.
+
+### Alur `.hdai`
+
+1. Validasi target media foto.
+2. Validasi ukuran maksimal 7 MB.
+3. Cek cooldown `.hdai`, sekitar 2 sampai 5 menit per user.
+4. Cek akses `canUseHdAi(context)`.
+5. Cek queue tidak penuh.
+6. Reserve 1 limit fitur memakai scope existing:
+   - grup memakai `groupJid`.
+   - private memakai `PRIVATE`.
+7. Jika limit habis, balas:
+
+```txt
+Limit fitur kamu habis.
+Kumpulkan poin dari game, lalu beli limit dengan .belilimit.
+```
+
+8. Masukkan job ke queue.
+9. Saat diproses, bot boleh mengirim:
+
+```txt
+Sedang memproses foto HD AI. Proses ini bisa memakan waktu lebih lama.
+```
+
+10. Jalankan AI upscale 4x.
+11. Kirim hasil sebagai image atau document.
+12. Jika sukses, jangan refund limit.
+13. Jika gagal, refund limit.
+14. Bersihkan temp file.
+
+### Output
+
+- `.hdai` kirim image JPEG/PNG aman.
+- `.hdai doc` kirim document.
+- Filename `hdai-photo.jpg` atau `hdai-photo.png`.
+- Mimetype sesuai output.
+
+### Acceptance Criteria
+
+- [x] Reply foto lalu `.hdai` berhasil jika dependency siap.
+- [x] Kirim foto caption `.hdai` berhasil jika dependency siap.
+- [x] Reply foto lalu `.hdai doc` berhasil jika dependency siap.
+- [x] Kirim foto caption `.hdai doc` berhasil jika dependency siap.
+- [x] Jika dependency belum siap, bot memberi pesan ramah.
+- [x] `.hdai` reserve 1 limit sebelum masuk proses.
+- [x] `.hdai` tidak reserve limit jika input invalid.
+- [x] `.hdai` tidak reserve limit jika cooldown aktif.
+- [x] `.hdai` tidak reserve limit jika queue penuh.
+- [x] `.hdai` refund limit jika proses gagal.
+- [x] Owner tetap unlimited.
+- [x] Queue tidak menjalankan banyak job paralel.
+- [x] Build dan lint berhasil.
+
+## Tahap 55 - Menu, Dokumentasi, dan Acceptance Test HD Foto (Selesai Code/Docs)
+
+Finalisasi fitur HD Foto dan HD AI Foto.
+
+### Update Menu
+
+Tambahkan ke section media:
+
+```txt
+.hd - Tingkatkan kualitas foto 2x
+.hd doc - Tingkatkan kualitas foto 2x dan kirim sebagai dokumen
+.hdai - Tingkatkan kualitas foto 4x dengan AI, memakai 1 limit fitur
+.hdai doc - Tingkatkan kualitas foto 4x dengan AI dan kirim sebagai dokumen, memakai 1 limit fitur
+```
+
+### Update Dokumentasi
+
+- README:
+  - Dependency `sharp`.
+  - Dependency AI upscale CLI jika dipakai.
+  - Perbedaan `.hd` dan `.hdai`.
+  - Batas input 7 MB.
+  - `.hdai` lebih lambat dan memakai queue.
+  - Mode `doc` menjaga kualitas.
+  - Limit fitur berlaku untuk downloader dan HD AI.
+- AGENT:
+  - Ringkasan fitur dan aturan limit fitur.
+- PLAN:
+  - Tandai tahap selesai setelah implementasi.
+
+### Acceptance Criteria
+
+- [x] `.menu` menampilkan `.hd`, `.hd doc`, `.hdai`, dan `.hdai doc`.
+- [x] README menjelaskan semua command HD.
+- [x] README menjelaskan limit fitur.
+- [x] AGENT sinkron dengan fitur baru.
+- [ ] Manual test `.hd` reply foto.
+- [ ] Manual test `.hd` caption foto.
+- [ ] Manual test `.hd doc`.
+- [ ] Manual test `.hdai` jika dependency siap.
+- [ ] Manual test `.hdai doc` jika dependency siap.
+- [ ] Manual test input > 7 MB.
+- [ ] Manual test media bukan foto.
+- [ ] Manual test cooldown.
+- [ ] Manual test queue penuh.
+- [ ] Manual test refund limit saat AI gagal.
+- [ ] Fitur lama tetap berjalan:
+  - `.tt`
+  - `.ig`
+  - `.igstory`
+  - `.s`
+  - `.gambar`
+  - `.menu`
+  - game.
+- [x] Build dan lint berhasil.
+
+Catatan: manual test WhatsApp perlu dijalankan dari device atau VPS setelah deploy, terutama `.hdai` karena butuh dependency AI eksternal.

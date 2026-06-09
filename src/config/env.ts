@@ -13,6 +13,8 @@ const envSchema = z.object({
   MAX_DOWNLOAD_MB: z.coerce.number().int().positive().default(50),
   YTDLP_BINARY: z.string().min(1).default('yt-dlp'),
   YTDLP_COOKIES_FILE: z.string().min(1).optional(),
+  HDAI_BINARY: z.string().min(1).default('real-esrgan-ncnn-vulkan'),
+  HDAI_TIMEOUT_MS: z.coerce.number().int().positive().default(180_000),
   TIMEZONE: z.string().min(1).default('Asia/Jakarta'),
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
